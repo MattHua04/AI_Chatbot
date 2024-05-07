@@ -20,7 +20,7 @@ The web interface was based on the MERN stack structure and includes features su
   * 2 EC2 instances (kept crashing with one due to limited specs with free tier)
   * 1 Route 53 hosted zone (routes for frontend and backend EC2 instances)
 
-## Demo the site here:
+## Demo:
 * Username: DEMO
 * Password: DEMO
 * Demo users can't edit their profile for obvious reasons, but you can still test out the conversation features
