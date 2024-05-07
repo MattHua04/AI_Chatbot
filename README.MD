@@ -9,6 +9,17 @@ Voice assistant capable of responding to complex prompts and satisfying music re
 The web interface was based on the MERN stack structure and includes features such as secure user authentication and login using password encryption and JWT access tokens, special interface options for admins (activating user accounts, deleting users, music playback control, voice assistant volume manipulation, song search suggestions), creating multiple conversation threads, and full-screen conversation mode. Both the frontend and backend were hosted on EC2 instances, request routing was handled using Route 53, and access over HTTPS was enabled by Caddy.
 </p>
 
+## Requirements:
+* Voice Assistant
+  * RPi 4B
+  * 3 tactile buttons
+  * 1 WS2812 LED ring
+  * Speaker HAT
+  * Custom 3D printed case
+* Web Interface
+  * 2 EC2 instances (kept crashing with one due to limited specs with free tier)
+  * 1 Route 53 hosted zone (routes for frontend and backend EC2 instances)
+
 ## Demo the site here:
 * Username: DEMO
 * Password: DEMO
