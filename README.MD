@@ -8,7 +8,7 @@
 
 ## Demo the site here:
 <p align="center">
-  <img href="https://ai-chatbot.hbypjt.com" src="media/Dashboard.jpg" alt="AI Chatbot" width="500">
+  <img href="https://ai-chatbot.hbypjt.com" src="media/Dashboard.jpg" alt="AI Chatbot" width="100%">
 </p>
 
 ## Listening for user prompt:
