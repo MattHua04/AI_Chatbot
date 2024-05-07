@@ -1,6 +1,6 @@
 <p align="center">
   <h1 align="center">AI Chatbot</h1>
-  <img src="media/Cover_Image.jpg" alt="Cover_Image" width="500">
+  <img align="center" src="media/Cover_Image.jpg" alt="Cover_Image" width="500">
 </p>
 
 <p>
