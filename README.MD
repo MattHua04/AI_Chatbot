@@ -13,6 +13,8 @@ The web interface was based on the MERN stack structure and includes features su
 * Username: DEMO
 * Password: DEMO
 * Demo users can't edit their profile for obvious reasons, but you can still test out the conversation features
+* <a href="https://github.com/MattHua04/AI_Chatbot_Frontend">Frontend Repo</a>
+* <a href="https://github.com/MattHua04/AI_Chatbot_Backend">Backend Repo</a>
 <p align="center">
   <a href="https://ai-chatbot.hbypjt.com">
     <img src="media/Dashboard.jpg" alt="AI Chatbot" width="100%">
