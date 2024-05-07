@@ -19,17 +19,17 @@ The web interface was based on the MERN stack structure and includes features su
   </a>
 </p>
 
-## Listening for user prompt:
+<h2 align="center">Listening for user prompt</h2>
 <p align="center">
   <img src="media/Listening.jpg" alt="Listening" width="400">
 </p>
 
-## Volume level visualization:
+<h2 align="center">Volume level visualization</h2>
 <p align="center">
   <img src="media/Volume.jpg" alt="Volume" width="400">
 </p>
 
-## Sleep mode:
+<h2 align="center">Sleep mode</h2>
 <p align="center">
   <img src="media/Sleep.jpg" alt="Sleep" width="400">
 </p>
