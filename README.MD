@@ -9,6 +9,7 @@
 ## Demo the site here:
 * Username: DEMO
 * Password: DEMO
+* Demo users can't edit their profile for obvious reasons, but you can still test out the conversation features
 <p align="center">
   <a href="https://ai-chatbot.hbypjt.com">
     <img src="media/Dashboard.jpg" alt="AI Chatbot" width="100%">
