@@ -628,8 +628,6 @@ def volControl(
     while True:
         if not volLevelVerbal.empty():
             currentVol = volLevelVerbal.get()
-        if not spotifyVol.empty():
-            currentVol = spotifyVol.get()
         state = None
         while state == None:
             try:
@@ -638,6 +636,18 @@ def volControl(
                 db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
                 stateCol = db["spotifies"]
                 state = stateCol.find_one()
+        
+        # Set volume
+        requestVol = state['volume']
+        if currentVol != requestVol:
+            currentVol = requestVol
+            volQueue.put(requestVol)
+            try:
+                audio.setvolume(
+                    round(math.log((requestVol) * 25 / 19) / 0.0488)
+                )
+            except:
+                audio.setvolume(0)
         
         # Increase volume
         if GPIO.input(23) == GPIO.HIGH and GPIO.input(24) == GPIO.LOW:
@@ -812,7 +822,7 @@ def splitIntoSentences(text: str) -> list[str]:
 
 
 def manageSongRequests(sp, spotifyVol, audio, volQueue):
-    # Connect to MongoDB
+    lastCall = time.time()
     db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
     stateCol = db["spotifies"]
     systemVolume = 50
@@ -821,6 +831,7 @@ def manageSongRequests(sp, spotifyVol, audio, volQueue):
     search = ''
     previoiusRequestSong = ['', '']
     requestSong = ['', '']
+    previousPlayState = 0
     while True:
         while not spotifyVol.empty():
             systemVolume = spotifyVol.get()
@@ -832,19 +843,6 @@ def manageSongRequests(sp, spotifyVol, audio, volQueue):
                 db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
                 stateCol = db["spotifies"]
                 state = stateCol.find_one()
-
-        # Set volume
-        requestVol = state['volume']
-        if systemVolume != requestVol:
-            systemVolume = requestVol
-            spotifyVol.put(requestVol)
-            volQueue.put(requestVol)
-            try:
-                audio.setvolume(
-                    round(math.log((requestVol) * 25 / 19) / 0.0488)
-                )
-            except:
-                audio.setvolume(0)
         
         # Get search results for the user's input
         previousSearch = search
@@ -894,10 +892,12 @@ def manageSongRequests(sp, spotifyVol, audio, volQueue):
                 pass
         
         currentSong = state['currentSong']
-        if currentSong[0] != '':
+        if currentSong[0] != '' and time.time() - lastCall > 0.5:
+            lastCall = time.time()
             try:
-                uri = sp.currently_playing()["item"]["uri"]
-                name = sp.currently_playing()["item"]["name"]
+                song = sp.currently_playing()["item"]
+                uri = song["uri"]
+                name = song["name"]
                 if uri != currentSong[1]:
                     stateCol.update_one(state, {'$set': {'currentSong': [name, uri]}})
             except:
@@ -905,17 +905,19 @@ def manageSongRequests(sp, spotifyVol, audio, volQueue):
             
         # Pause / Resume
         requestPlayState = state['playState']
-        try:
-            if sp.currently_playing()["is_playing"] and (requestPlayState == 0):
-                sp.pause_playback(
-                    "spotifyDeviceId"
-                )
-            elif not sp.currently_playing()["is_playing"] and (requestPlayState == 1):
-                sp.start_playback(
-                    "spotifyDeviceId"
-                )
-        except:
-            pass
+        if requestPlayState != previousPlayState:
+            previousPlayState = requestPlayState
+            try:
+                if sp.currently_playing()["is_playing"] and (requestPlayState == 0):
+                    sp.pause_playback(
+                        "spotifyDeviceId"
+                    )
+                elif not sp.currently_playing()["is_playing"] and (requestPlayState == 1):
+                    sp.start_playback(
+                        "spotifyDeviceId"
+                    )
+            except:
+                pass
         
         # Prev / Next
         requestControlPlayState = state['controlPlayState']
