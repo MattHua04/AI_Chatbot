@@ -834,9 +834,9 @@ def manageSongRequests(sp, spotifyVol, audio, volQueue):
                 state = stateCol.find_one()
 
         # Set volume
-        systemVolume = requestVol
         requestVol = state['volume']
         if systemVolume != requestVol:
+            systemVolume = requestVol
             spotifyVol.put(requestVol)
             volQueue.put(requestVol)
             try:
@@ -902,27 +902,7 @@ def manageSongRequests(sp, spotifyVol, audio, volQueue):
                     stateCol.update_one(state, {'$set': {'currentSong': [name, uri]}})
             except:
                 pass
-        
-        # Prev / Next
-        requestControlPlayState = state['controlPlayState']
-        if requestControlPlayState != 0:
-            if requestControlPlayState == 1:
-                try:
-                    sp.next_track(
-                        "spotifyDeviceId"
-                    )
-                    stateCol.update_one(state, {'$set': {'controlPlayState': 0}})
-                except:
-                    pass
-            elif requestControlPlayState == -1:
-                try:
-                    sp.previous_track(
-                        "spotifyDeviceId"
-                    )
-                    stateCol.update_one(state, {'$set': {'controlPlayState': 0}})
-                except:
-                    pass
-        
+            
         # Pause / Resume
         requestPlayState = state['playState']
         try:
@@ -936,6 +916,32 @@ def manageSongRequests(sp, spotifyVol, audio, volQueue):
                 )
         except:
             pass
+        
+        # Prev / Next
+        requestControlPlayState = state['controlPlayState']
+        if requestControlPlayState != 0:
+            if requestControlPlayState == 1:
+                try:
+                    sp.next_track(
+                        "spotifyDeviceId"
+                    )
+                    sp.start_playback(
+                        "spotifyDeviceId"
+                    )
+                    stateCol.update_one(state, {'$set': {'controlPlayState': 0, 'playState': 1}})
+                except:
+                    pass
+            elif requestControlPlayState == -1:
+                try:
+                    sp.previous_track(
+                        "spotifyDeviceId"
+                    )
+                    sp.start_playback(
+                        "spotifyDeviceId"
+                    )
+                    stateCol.update_one(state, {'$set': {'controlPlayState': 0, 'playState': 1}})
+                except:
+                    pass
 
 
 if __name__ == "__main__":
@@ -1037,9 +1043,11 @@ if __name__ == "__main__":
         target=lightsControl, args=(pixels, onOff, lightsUsageStatus, sleepLightsState)
     )
     processes.append(lights)
+    lightsUsageStatus.put(True)
     lights.start()
     convertToSpeech("Hi my name is " + name)
     onOff.put("lightsOff")
+    lightsUsageStatus.put(False)
 
     while True:
         # Wait for action button to reset before continuing
@@ -1194,34 +1202,42 @@ if __name__ == "__main__":
                                                 auth_manager=auth_manager
                                             )
                                             if sp.currently_playing()["is_playing"]:
-                                                auth_manager = SpotifyOAuth(
-                                                    "clientID",
-                                                    "clientSecret",
-                                                    "http://localhost:5173/callback",
-                                                    scope="user-modify-playback-state",
-                                                    cache_path="/home/matthewpi/Spotify/.cache",
-                                                )
-                                                sp = spotipy.Spotify(
-                                                    auth_manager=auth_manager
-                                                )
-                                                sp.pause_playback(
-                                                    "spotifyDeviceId"
-                                                )
+                                                db = MongoClient("mongodb+srv://matthewhua8:Ma44hew@cluster0.5csugkc.mongodb.net/", tlsCAFile=certifi.where())['test']
+                                                stateCol = db["spotifies"]
+                                                state = stateCol.find_one()
+                                                stateCol.update_one(state, {'$set': {'playState': 0}})
+                                                # auth_manager = SpotifyOAuth(
+                                                #     "clientID",
+                                                #     "clientSecret",
+                                                #     "http://localhost:5173/callback",
+                                                #     scope="user-modify-playback-state",
+                                                #     cache_path="/home/matthewpi/Spotify/.cache",
+                                                # )
+                                                # sp = spotipy.Spotify(
+                                                #     auth_manager=auth_manager
+                                                # )
+                                                # sp.pause_playback(
+                                                #     "spotifyDeviceId"
+                                                # )
                                                 print("Pausing . . .")
                                             else:
-                                                auth_manager = SpotifyOAuth(
-                                                    "clientID",
-                                                    "clientSecret",
-                                                    "http://localhost:5173/callback",
-                                                    scope="user-modify-playback-state",
-                                                    cache_path="/home/matthewpi/Spotify/.cache",
-                                                )
-                                                sp = spotipy.Spotify(
-                                                    auth_manager=auth_manager
-                                                )
-                                                sp.start_playback(
-                                                    "spotifyDeviceId"
-                                                )
+                                                db = MongoClient("mongodb+srv://matthewhua8:Ma44hew@cluster0.5csugkc.mongodb.net/", tlsCAFile=certifi.where())['test']
+                                                stateCol = db["spotifies"]
+                                                state = stateCol.find_one()
+                                                stateCol.update_one(state, {'$set': {'playState': 1}})
+                                                # auth_manager = SpotifyOAuth(
+                                                #     "clientID",
+                                                #     "clientSecret",
+                                                #     "http://localhost:5173/callback",
+                                                #     scope="user-modify-playback-state",
+                                                #     cache_path="/home/matthewpi/Spotify/.cache",
+                                                # )
+                                                # sp = spotipy.Spotify(
+                                                #     auth_manager=auth_manager
+                                                # )
+                                                # sp.start_playback(
+                                                #     "spotifyDeviceId"
+                                                # )
                                                 print("Resuming . . .")
                                         except:
                                             pass
@@ -1273,36 +1289,44 @@ if __name__ == "__main__":
                             )
                             sp = spotipy.Spotify(auth_manager=auth_manager)
                             if sp.currently_playing()["is_playing"]:
-                                auth_manager = SpotifyOAuth(
-                                    "clientID",
-                                    "clientSecret",
-                                    "http://localhost:5173/callback",
-                                    scope="user-modify-playback-state",
-                                    cache_path="/home/matthewpi/Spotify/.cache",
-                                )
-                                sp = spotipy.Spotify(auth_manager=auth_manager)
-                                try:
-                                    sp.pause_playback(
-                                        "spotifyDeviceId"
-                                    )
-                                except:
-                                    pass
+                                db = MongoClient("mongodb+srv://matthewhua8:Ma44hew@cluster0.5csugkc.mongodb.net/", tlsCAFile=certifi.where())['test']
+                                stateCol = db["spotifies"]
+                                state = stateCol.find_one()
+                                stateCol.update_one(state, {'$set': {'playState': 0}})
+                                # auth_manager = SpotifyOAuth(
+                                #     "clientID",
+                                #     "clientSecret",
+                                #     "http://localhost:5173/callback",
+                                #     scope="user-modify-playback-state",
+                                #     cache_path="/home/matthewpi/Spotify/.cache",
+                                # )
+                                # sp = spotipy.Spotify(auth_manager=auth_manager)
+                                # try:
+                                #     sp.pause_playback(
+                                #         "spotifyDeviceId"
+                                #     )
+                                # except:
+                                #     pass
                                 print("Pausing . . .")
                             else:
-                                auth_manager = SpotifyOAuth(
-                                    "clientID",
-                                    "clientSecret",
-                                    "http://localhost:5173/callback",
-                                    scope="user-modify-playback-state",
-                                    cache_path="/home/matthewpi/Spotify/.cache",
-                                )
-                                sp = spotipy.Spotify(auth_manager=auth_manager)
-                                try:
-                                    sp.start_playback(
-                                        "spotifyDeviceId"
-                                    )
-                                except:
-                                    pass
+                                db = MongoClient("mongodb+srv://matthewhua8:Ma44hew@cluster0.5csugkc.mongodb.net/", tlsCAFile=certifi.where())['test']
+                                stateCol = db["spotifies"]
+                                state = stateCol.find_one()
+                                stateCol.update_one(state, {'$set': {'playState': 1}})
+                                # auth_manager = SpotifyOAuth(
+                                #     "clientID",
+                                #     "clientSecret",
+                                #     "http://localhost:5173/callback",
+                                #     scope="user-modify-playback-state",
+                                #     cache_path="/home/matthewpi/Spotify/.cache",
+                                # )
+                                # sp = spotipy.Spotify(auth_manager=auth_manager)
+                                # try:
+                                #     sp.start_playback(
+                                #         "spotifyDeviceId"
+                                #     )
+                                # except:
+                                #     pass
                                 print("Resuming . . .")
                         except:
                             pass
@@ -1328,9 +1352,22 @@ if __name__ == "__main__":
             cache_path="/home/matthewpi/Spotify/.cache",
         )
         sp = spotipy.Spotify(auth_manager=auth_manager)
-        originalState = sp.currently_playing()["is_playing"]
+        originalState = False
         try:
-            sp.pause_playback("spotifyDeviceId")
+            originalState = sp.currently_playing()["is_playing"]
+        except:
+            pass
+        # Connect to MongoDB
+        state = None
+        while state == None:
+            try:
+                state = stateCol.find_one()
+            except:
+                db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+                stateCol = db["spotifies"]
+                state = stateCol.find_one()
+        try:
+            stateCol.update_one(state, {'$set': {'playState': 0}})
         except:
             pass
         # Turn on lights to signify listening
@@ -1373,8 +1410,16 @@ if __name__ == "__main__":
             )
             sp = spotipy.Spotify(auth_manager=auth_manager)
             if originalState:
+                state = None
+                while state == None:
+                    try:
+                        state = stateCol.find_one()
+                    except:
+                        db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+                        stateCol = db["spotifies"]
+                        state = stateCol.find_one()
                 try:
-                    sp.start_playback("spotifyDeviceId")
+                    stateCol.update_one(state, {'$set': {'playState': 1}})
                 except:
                     pass
             continue
@@ -1427,7 +1472,15 @@ if __name__ == "__main__":
             cache_path="/home/matthewpi/Spotify/.cache",
         )
         sp = spotipy.Spotify(auth_manager=auth_manager)
+        state = None
+        while state == None:
+            try:
+                state = stateCol.find_one()
+            except:
+                db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+                stateCol = db["spotifies"]
+                state = stateCol.find_one()
         try:
-            sp.start_playback("spotifyDeviceId")
+            stateCol.update_one(state, {'$set': {'playState': 1}})
         except:
             pass
