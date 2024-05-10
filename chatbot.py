@@ -614,7 +614,6 @@ def volControl(
     lightsUsageStatus,
     sleepLightsState,
     currentColor,
-    spotifyVol,
 ):
     db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
     stateCol = db["spotifies"]
@@ -671,7 +670,6 @@ def volControl(
                     audio.setvolume(100)
                     stateCol.update_one(state, {'$set': {'volume': 100}})
             currentVol = currentVol + 5 if (currentVol + 5 < 100) else 100
-            spotifyVol.put(currentVol)
             volQueue.put(currentVol)
             holdStart = time.time()
             while GPIO.input(23) == GPIO.HIGH and GPIO.input(24) == GPIO.LOW:
@@ -821,7 +819,7 @@ def splitIntoSentences(text: str) -> list[str]:
     return sentences
 
 
-def manageSongRequests(sp, spotifyVol, audio, volQueue):
+def manageSongRequests(sp):
     lastCall = time.time()
     db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
     stateCol = db["spotifies"]
@@ -833,8 +831,6 @@ def manageSongRequests(sp, spotifyVol, audio, volQueue):
     requestSong = ['', '']
     previousPlayState = 0
     while True:
-        while not spotifyVol.empty():
-            systemVolume = spotifyVol.get()
         state = None
         while state == None:
             try:
@@ -1011,7 +1007,6 @@ if __name__ == "__main__":
     volLevelVerbal = Queue()
     volLevelButton = Queue()
     volQueue = Queue()
-    spotifyVol = Queue()
     # Start volume control process
     controlVol = Process(
         target=volControl,
@@ -1024,13 +1019,12 @@ if __name__ == "__main__":
             lightsUsageStatus,
             sleepLightsState,
             currentColor,
-            spotifyVol,
         ),
     )
     processes.append(controlVol)
     controlVol.start()
     # Set up spotify manager
-    spotifyManager = Process(target=manageSongRequests, args=(sp, spotifyVol, audio, volQueue,))
+    spotifyManager = Process(target=manageSongRequests, args=(sp))
     processes.append(spotifyManager)
     spotifyManager.start()
     # Set up microphone input
@@ -1346,19 +1340,6 @@ if __name__ == "__main__":
             listen.join()
             messages = return_dict.values()[0]
         # Temporarily pause any songs currently playing to listen to user
-        auth_manager = SpotifyOAuth(
-            "clientID",
-            "clientSecret",
-            "http://localhost:5173/callback",
-            scope="user-modify-playback-state",
-            cache_path="/home/matthewpi/Spotify/.cache",
-        )
-        sp = spotipy.Spotify(auth_manager=auth_manager)
-        originalState = False
-        try:
-            originalState = sp.currently_playing()["is_playing"]
-        except:
-            pass
         # Connect to MongoDB
         state = None
         while state == None:
@@ -1368,6 +1349,7 @@ if __name__ == "__main__":
                 db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
                 stateCol = db["spotifies"]
                 state = stateCol.find_one()
+        originalState = state['playState'] == 1
         try:
             stateCol.update_one(state, {'$set': {'playState': 0}})
         except:
