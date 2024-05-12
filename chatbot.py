@@ -943,6 +943,12 @@ def manageSongRequests(sp):
 
 
 if __name__ == "__main__":
+    # Setup Caddy
+    os.system("caddy stop")
+    os.system("sudo systemctl restart caddy")
+    # Connect to MongoDB
+    db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+    stateCol = db["spotifies"]
     # List of all multiprocesses
     processes = []
     # Set up action button
@@ -1198,7 +1204,7 @@ if __name__ == "__main__":
                                                 auth_manager=auth_manager
                                             )
                                             if sp.currently_playing()["is_playing"]:
-                                                db = MongoClient("mongodb+srv://matthewhua8:Ma44hew@cluster0.5csugkc.mongodb.net/", tlsCAFile=certifi.where())['test']
+                                                db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
                                                 stateCol = db["spotifies"]
                                                 state = stateCol.find_one()
                                                 stateCol.update_one(state, {'$set': {'playState': 0}})
@@ -1217,7 +1223,7 @@ if __name__ == "__main__":
                                                 # )
                                                 print("Pausing . . .")
                                             else:
-                                                db = MongoClient("mongodb+srv://matthewhua8:Ma44hew@cluster0.5csugkc.mongodb.net/", tlsCAFile=certifi.where())['test']
+                                                db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
                                                 stateCol = db["spotifies"]
                                                 state = stateCol.find_one()
                                                 stateCol.update_one(state, {'$set': {'playState': 1}})
@@ -1285,7 +1291,7 @@ if __name__ == "__main__":
                             )
                             sp = spotipy.Spotify(auth_manager=auth_manager)
                             if sp.currently_playing()["is_playing"]:
-                                db = MongoClient("mongodb+srv://matthewhua8:Ma44hew@cluster0.5csugkc.mongodb.net/", tlsCAFile=certifi.where())['test']
+                                db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
                                 stateCol = db["spotifies"]
                                 state = stateCol.find_one()
                                 stateCol.update_one(state, {'$set': {'playState': 0}})
@@ -1305,7 +1311,7 @@ if __name__ == "__main__":
                                 #     pass
                                 print("Pausing . . .")
                             else:
-                                db = MongoClient("mongodb+srv://matthewhua8:Ma44hew@cluster0.5csugkc.mongodb.net/", tlsCAFile=certifi.where())['test']
+                                db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
                                 stateCol = db["spotifies"]
                                 state = stateCol.find_one()
                                 stateCol.update_one(state, {'$set': {'playState': 1}})
