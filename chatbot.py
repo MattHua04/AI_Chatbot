@@ -1175,20 +1175,24 @@ if __name__ == "__main__":
                                             break
                                     # Skip if triple clicked
                                     if triple:
-                                        auth_manager = SpotifyOAuth(
-                                            "clientID",
-                                            "clientSecret",
-                                            "http://localhost:5173/callback",
-                                            scope="user-modify-playback-state",
-                                            cache_path="/home/matthewpi/Spotify/.cache",
-                                        )
-                                        sp = spotipy.Spotify(auth_manager=auth_manager)
-                                        try:
-                                            sp.next_track(
-                                                "spotifyDeviceId"
-                                            )
-                                        except:
-                                            pass
+                                        # auth_manager = SpotifyOAuth(
+                                        #     "clientID",
+                                        #     "clientSecret",
+                                        #     "http://localhost:5173/callback",
+                                        #     scope="user-modify-playback-state",
+                                        #     cache_path="/home/matthewpi/Spotify/.cache",
+                                        # )
+                                        # sp = spotipy.Spotify(auth_manager=auth_manager)
+                                        # try:
+                                        #     sp.next_track(
+                                        #         "spotifyDeviceId"
+                                        #     )
+                                        # except:
+                                        #     pass
+                                        db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+                                        stateCol = db["spotifies"]
+                                        state = stateCol.find_one()
+                                        stateCol.update_one(state, {'$set': {'controlPlayState': 1}})
                                         print("Skipping song . . .")
                                     # Pause/Resume if double clicked
                                     elif double:
@@ -1266,18 +1270,22 @@ if __name__ == "__main__":
                             break
                     # Skip if triple clicked
                     if triple:
-                        auth_manager = SpotifyOAuth(
-                            "clientID",
-                            "clientSecret",
-                            "http://localhost:5173/callback",
-                            scope="user-modify-playback-state",
-                            cache_path="/home/matthewpi/Spotify/.cache",
-                        )
-                        sp = spotipy.Spotify(auth_manager=auth_manager)
-                        try:
-                            sp.next_track("spotifyDeviceId")
-                        except:
-                            pass
+                        # auth_manager = SpotifyOAuth(
+                        #     "clientID",
+                        #     "clientSecret",
+                        #     "http://localhost:5173/callback",
+                        #     scope="user-modify-playback-state",
+                        #     cache_path="/home/matthewpi/Spotify/.cache",
+                        # )
+                        # sp = spotipy.Spotify(auth_manager=auth_manager)
+                        # try:
+                        #     sp.next_track("spotifyDeviceId")
+                        # except:
+                        #     pass
+                        db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+                        stateCol = db["spotifies"]
+                        state = stateCol.find_one()
+                        stateCol.update_one(state, {'$set': {'controlPlayState': 1}})
                         print("Skipping song . . .")
                     # Pause/Resume if double clicked
                     elif double:
