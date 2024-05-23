@@ -1391,14 +1391,14 @@ if __name__ == "__main__":
         # Don't respond if chat cancelled through action button
         if cancelled:
             # Resume any songs that were paused while listening for prompt
-            auth_manager = SpotifyOAuth(
-                "clientID",
-                "clientSecret",
-                "http://localhost:5173/callback",
-                scope="user-modify-playback-state",
-                cache_path="/home/matthewpi/Spotify/.cache",
-            )
-            sp = spotipy.Spotify(auth_manager=auth_manager)
+            # auth_manager = SpotifyOAuth(
+            #     "clientID",
+            #     "clientSecret",
+            #     "http://localhost:5173/callback",
+            #     scope="user-modify-playback-state",
+            #     cache_path="/home/matthewpi/Spotify/.cache",
+            # )
+            # sp = spotipy.Spotify(auth_manager=auth_manager)
             if originalState:
                 state = None
                 while state == None:
@@ -1454,23 +1454,24 @@ if __name__ == "__main__":
                 break
         onOff.put("lightsOff")
         # Resume any songs that were paused while listening for prompt
-        auth_manager = SpotifyOAuth(
-            "clientID",
-            "clientSecret",
-            "http://localhost:5173/callback",
-            scope="user-modify-playback-state",
-            cache_path="/home/matthewpi/Spotify/.cache",
-        )
-        sp = spotipy.Spotify(auth_manager=auth_manager)
-        state = None
-        while state == None:
+        # auth_manager = SpotifyOAuth(
+        #     "clientID",
+        #     "clientSecret",
+        #     "http://localhost:5173/callback",
+        #     scope="user-modify-playback-state",
+        #     cache_path="/home/matthewpi/Spotify/.cache",
+        # )
+        # sp = spotipy.Spotify(auth_manager=auth_manager)
+        if originalState:
+            state = None
+            while state == None:
+                try:
+                    state = stateCol.find_one()
+                except:
+                    db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+                    stateCol = db["spotifies"]
+                    state = stateCol.find_one()
             try:
-                state = stateCol.find_one()
+                stateCol.update_one(state, {'$set': {'playState': 1}})
             except:
-                db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
-                stateCol = db["spotifies"]
-                state = stateCol.find_one()
-        try:
-            stateCol.update_one(state, {'$set': {'playState': 1}})
-        except:
-            pass
+                pass
