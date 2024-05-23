@@ -845,7 +845,7 @@ def manageSongRequests(sp):
         search = state['input']
         if search != '' and search != previousSearch:
             try:
-                searchResults = sp.search(search, 5, 0, "track,playlist")
+                searchResults = sp.search(search, 3, 0, "track,playlist")
                 playlists = searchResults['playlists']['items']
                 formattedPlaylists = []
                 for playlist in playlists:
