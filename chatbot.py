@@ -823,11 +823,8 @@ def manageSongRequests(sp):
     lastCall = time.time()
     db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
     stateCol = db["spotifies"]
-    systemVolume = 50
-    requestVol = systemVolume
     previousSearch = ''
     search = ''
-    previoiusRequestSong = ['', '']
     requestSong = ['', '']
     previousPlayState = 0
     while True:
@@ -864,7 +861,6 @@ def manageSongRequests(sp):
             stateCol.update_one(state, {'$set': {'searchResults': []}})
         
         # Start playing the requested song
-        previoiusRequestSong = requestSong
         requestSong = state['songRequest']
         if requestSong[0] != '' and requestSong != previoiusRequestSong:
             try:
