@@ -846,12 +846,12 @@ def manageSongRequests(sp):
                 playlists = searchResults['playlists']['items']
                 formattedPlaylists = []
                 for playlist in playlists:
-                    formattedPlaylists.append([playlist['name'], playlist['uri']])
+                    formattedPlaylists.append([playlist['name'], playlist['uri'], playlist['album']['images'][0]['url']])
                 
                 tracks = searchResults['tracks']['items']
                 formattedTracks = []
                 for track in tracks:
-                    formattedTracks.append([track['name'], track['uri']])
+                    formattedTracks.append([track['name'], track['uri'], track['album']['images'][0]['url']])
                 
                 searchResults = formattedPlaylists + formattedTracks
                 stateCol.update_one(state, {'$set': {'searchResults': searchResults}})
@@ -862,7 +862,7 @@ def manageSongRequests(sp):
         
         # Start playing the requested song
         requestSong = state['songRequest']
-        if requestSong[0] != '' and requestSong != previoiusRequestSong:
+        if requestSong[0] != '':
             try:
                 stateCol.update_one(state, {'$set': {'currentSong': requestSong, 'songRequest': ['', ''], 'playState': 1, 'playControl': 0}})
                 if 'playlist' in requestSong[1]:
