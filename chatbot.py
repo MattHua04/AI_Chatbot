@@ -846,7 +846,7 @@ def manageSongRequests(sp):
                 playlists = searchResults['playlists']['items']
                 formattedPlaylists = []
                 for playlist in playlists:
-                    formattedPlaylists.append([playlist['name'], playlist['uri'], playlist['album']['images'][0]['url']])
+                    formattedPlaylists.append([playlist['name'], playlist['uri'], playlist['images'][0]['url']])
                 
                 tracks = searchResults['tracks']['items']
                 formattedTracks = []
