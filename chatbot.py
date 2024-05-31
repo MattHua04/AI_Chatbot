@@ -821,6 +821,7 @@ def splitIntoSentences(text: str) -> list[str]:
 
 def manageSongRequests(sp):
     lastCall = time.time()
+    lastSync = lastCall
     db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
     stateCol = db["spotifies"]
     previousSearch = ''
@@ -900,7 +901,7 @@ def manageSongRequests(sp):
         if requestPlayState != previousPlayState:
             previousPlayState = requestPlayState
             try:
-                if sp.currently_playing()["is_playing"] and (requestPlayState == 0):
+                if requestPlayState == 0:
                     sp.transfer_playback(
                         "spotifyDeviceId",
                         force_play=False,
@@ -908,14 +909,14 @@ def manageSongRequests(sp):
                     sp.pause_playback(
                         "spotifyDeviceId"
                     )
-                elif not sp.currently_playing()["is_playing"] and (requestPlayState == 1):
+                elif requestPlayState == 1:
                     sp.transfer_playback(
                         "spotifyDeviceId",
-                        force_play=False,
+                        force_play=True,
                     )
-                    sp.start_playback(
-                        "spotifyDeviceId"
-                    )
+                    # sp.start_playback(
+                    #     "spotifyDeviceId"
+                    # )
             except:
                 pass
         
@@ -926,7 +927,7 @@ def manageSongRequests(sp):
                 try:
                     sp.transfer_playback(
                         "spotifyDeviceId",
-                        force_play=False,
+                        force_play=True,
                     )
                     sp.next_track(
                         "spotifyDeviceId"
@@ -941,7 +942,7 @@ def manageSongRequests(sp):
                 try:
                     sp.transfer_playback(
                         "spotifyDeviceId",
-                        force_play=False,
+                        force_play=True,
                     )
                     sp.previous_track(
                         "spotifyDeviceId"
@@ -952,6 +953,20 @@ def manageSongRequests(sp):
                     stateCol.update_one(state, {'$set': {'controlPlayState': 0, 'playState': 1}})
                 except:
                     pass
+        
+        # Sync play state
+        if time.time() - lastSync > 1:
+            try:
+                lastSync = time.time()
+                globalPlayState = sp.currently_playing()["is_playing"]
+                if globalPlayState and previousPlayState == 0:
+                    stateCol.update_one(state, {'$set': {'playState': 1}})
+                    previousPlayState = 1
+                elif not globalPlayState and previousPlayState == 1:
+                    stateCol.update_one(state, {'$set': {'playState': 0}})
+                    previousPlayState = 0
+            except:
+                pass
 
 
 if __name__ == "__main__":
