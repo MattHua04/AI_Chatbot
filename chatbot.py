@@ -901,10 +901,18 @@ def manageSongRequests(sp):
             previousPlayState = requestPlayState
             try:
                 if sp.currently_playing()["is_playing"] and (requestPlayState == 0):
+                    sp.transfer_playback(
+                        "spotifyDeviceId",
+                        force_play=False,
+                    )
                     sp.pause_playback(
                         "spotifyDeviceId"
                     )
                 elif not sp.currently_playing()["is_playing"] and (requestPlayState == 1):
+                    sp.transfer_playback(
+                        "spotifyDeviceId",
+                        force_play=False,
+                    )
                     sp.start_playback(
                         "spotifyDeviceId"
                     )
@@ -916,23 +924,31 @@ def manageSongRequests(sp):
         if requestControlPlayState != 0:
             if requestControlPlayState == 1:
                 try:
+                    sp.transfer_playback(
+                        "spotifyDeviceId",
+                        force_play=False,
+                    )
                     sp.next_track(
                         "spotifyDeviceId"
                     )
-                    sp.start_playback(
-                        "spotifyDeviceId"
-                    )
+                    # sp.start_playback(
+                    #     "spotifyDeviceId"
+                    # )
                     stateCol.update_one(state, {'$set': {'controlPlayState': 0, 'playState': 1}})
                 except:
                     pass
             elif requestControlPlayState == -1:
                 try:
+                    sp.transfer_playback(
+                        "spotifyDeviceId",
+                        force_play=False,
+                    )
                     sp.previous_track(
                         "spotifyDeviceId"
                     )
-                    sp.start_playback(
-                        "spotifyDeviceId"
-                    )
+                    # sp.start_playback(
+                    #     "spotifyDeviceId"
+                    # )
                     stateCol.update_one(state, {'$set': {'controlPlayState': 0, 'playState': 1}})
                 except:
                     pass
