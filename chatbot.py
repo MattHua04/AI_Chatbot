@@ -821,7 +821,6 @@ def splitIntoSentences(text: str) -> list[str]:
 
 def manageSongRequests(sp):
     lastCall = time.time()
-    lastSync = lastCall
     db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
     stateCol = db["spotifies"]
     previousSearch = ''
@@ -884,15 +883,25 @@ def manageSongRequests(sp):
             except:
                 pass
         
+        # Update current song and play state
         currentSong = state['currentSong']
-        if currentSong[0] != '' and time.time() - lastCall > 0.5:
+        if currentSong[0] != '' and time.time() - lastCall > 1:
             lastCall = time.time()
             try:
-                song = sp.currently_playing()["item"]
+                current = sp.currently_playing()
+                song = current["item"]
                 uri = song["uri"]
                 name = song["name"]
                 if uri != currentSong[1]:
                     stateCol.update_one(state, {'$set': {'currentSong': [name, uri]}})
+                
+                globalPlayState = current["is_playing"]
+                if globalPlayState and previousPlayState == 0:
+                    stateCol.update_one(state, {'$set': {'playState': 1}})
+                    previousPlayState = 1
+                elif not globalPlayState and previousPlayState == 1:
+                    stateCol.update_one(state, {'$set': {'playState': 0}})
+                    previousPlayState = 0
             except:
                 pass
             
@@ -953,20 +962,6 @@ def manageSongRequests(sp):
                     stateCol.update_one(state, {'$set': {'controlPlayState': 0, 'playState': 1}})
                 except:
                     pass
-        
-        # Sync play state
-        if time.time() - lastSync > 1:
-            try:
-                lastSync = time.time()
-                globalPlayState = sp.currently_playing()["is_playing"]
-                if globalPlayState and previousPlayState == 0:
-                    stateCol.update_one(state, {'$set': {'playState': 1}})
-                    previousPlayState = 1
-                elif not globalPlayState and previousPlayState == 1:
-                    stateCol.update_one(state, {'$set': {'playState': 0}})
-                    previousPlayState = 0
-            except:
-                pass
 
 
 if __name__ == "__main__":
