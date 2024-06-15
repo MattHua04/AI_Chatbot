@@ -563,6 +563,15 @@ def spotifyAuth():
             cache_path="/home/matthewpi/Spotify/.cache",
         )
         sp = spotipy.Spotify(auth_manager=auth_manager)
+        
+        rpiOnline = False
+        devices = sp.devices()['devices']
+        for device in devices:
+            if device['id'] == "06c55ec62f492429c6ebbf38fc814d5a7382386f":
+                rpiOnline = True
+                break
+        if not rpiOnline:
+            os.system("sudo systemctl restart raspotify")
 
 
 def volLights(pixels, volQueue, lightsUsageStatus, sleepLightsState, currentColor, terminateVolLights):
