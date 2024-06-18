@@ -63,6 +63,12 @@ def listenForKeyWord(
     with sr.Microphone() as source:
         while "hey " + name.lower() not in text.lower():
             speech = recorder.listen(source, phrase_time_limit=3)
+            
+            # Trim text memory
+            words = text.split()
+            if len(words) > 10:
+                text = ' '.join(words[1:])
+
             try:
                 text += recorder.recognize_google(speech)
             except:
