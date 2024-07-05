@@ -5,6 +5,7 @@ import time
 import copy
 import certifi
 import spotipy
+import tiktoken
 import alsaaudio
 import sounddevice
 import numpy as np
@@ -363,6 +364,7 @@ def respond(responseSentences):
         fileLen = audioFile.info.length
 
 def sendPrompt(messages):
+    messages = cropToMeetMaxTokens(messages)
     client = OpenAI(api_key="OpenAIKey")
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
@@ -977,7 +979,22 @@ def manageSongRequests(sp):
                     stateCol.update_one(state, {'$set': {'controlPlayState': 0, 'playState': 1}})
                 except:
                     pass
+                
+def count_tokens(messages):
+    encoder = tiktoken.encoding_for_model("gpt-3.5-turbo")
+    total_tokens = 0
+    for message in messages:
+        message_tokens = encoder.encode(message["content"])
+        total_tokens += len(message_tokens) + len(encoder.encode(message["role"]))
+    return total_tokens
 
+def cropToMeetMaxTokens(messages):
+    # Maximum tokens for the gpt-3.5-turbo model
+    MAX_TOKENS = 16385 * 0.8
+    # Count tokens and remove oldest messages if needed
+    while count_tokens(messages) > MAX_TOKENS:
+        messages.pop(0)
+    return messages
 
 if __name__ == "__main__":
     # Setup Caddy
@@ -1469,6 +1486,7 @@ if __name__ == "__main__":
         # Send prompt to ChatGPT
         client = OpenAI(api_key="OpenAIKey")
         messages.append({"role": "user", "content": text})
+        messages = cropToMeetMaxTokens(messages)
         response = client.chat.completions.create(
             model="gpt-3.5-turbo", messages=messages
         )
