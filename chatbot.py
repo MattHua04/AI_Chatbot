@@ -3,6 +3,9 @@ import re
 import math
 import time
 import copy
+import zlib
+import json
+import base64
 import certifi
 import spotipy
 import tiktoken
@@ -386,36 +389,41 @@ def postPromptResponse(messages, conversation, conversations):
     response = sendPrompt(messages)
     updated_content = copy.deepcopy(content)
     updated_content.append(["AI", response])
+    # Compress content before updating document in MongoDB
+    updated_content = compress_content(updated_content)
     conversations.update_one({"_id": id}, {"$set": {"content": updated_content}})
 
 def findRemotePrompts(sp, pixels, lightsUsageStatus, sleepLightsState):
     # Remote conversation memory
-    remoteMessages=[]
+    remoteMessages = []
     # Connect to MongoDB
     db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
     conversations = db["conversations"]
-    # Query for finding conversations with unanswered prompts
-    pipeline = [
-        {"$addFields": {
-            "last_message_owner": {"$arrayElemAt": [{"$arrayElemAt": ["$content", -1]}, 0]}
-        }},
-        {"$match": {"last_message_owner": "User"}}
-    ]
-    # Search for unanswered prompts
+    
     while True:
-        # Get all prompts and corresponding responses
         conversationQueue = None
         while conversationQueue == None:
             try:
-                conversationQueue = list(conversations.aggregate(pipeline))
+                # Retrieve all conversations
+                all_conversations = list(conversations.find())
+                # Decompress content and filter conversations with the last message from "User"
+                conversationQueue = []
+                for conversation in all_conversations:
+                    if conversation['content'] is not None:
+                        conversation['content'] = decompress_content(conversation['content'])
+                        if conversation['content'] and len(conversation['content']) > 0:
+                            last_message_owner = conversation['content'][-1][0]
+                            if last_message_owner == "User":
+                                conversationQueue.append(conversation)
             except:
                 db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
                 conversations = db["conversations"]
-                conversationQueue = list(conversations.aggregate(pipeline))
+        
         try:
             # Check if each prompt has a response given
             threads = []
             for conversation in conversationQueue:
+                remoteMessages = conversation['content']
                 t = Thread(target=postPromptResponse, args=(remoteMessages, conversation, conversations))
                 threads.append(t)
                 t.start()
@@ -423,6 +431,23 @@ def findRemotePrompts(sp, pixels, lightsUsageStatus, sleepLightsState):
                 t.join()
         except:
             pass
+        
+def decompress_content(content):
+    try:
+        compressed_content = base64.b64decode(content)
+        decompressed_content = zlib.decompress(compressed_content, 15 + 32).decode('utf-8')
+        return json.loads(decompressed_content)
+    except:
+        return []
+    
+def compress_content(content):
+    try:
+        json_content = json.dumps(content)
+        compressed_content = zlib.compress(json_content.encode('utf-8'))  # Compress the content
+        return base64.b64encode(compressed_content).decode('utf-8')
+    except:
+        return ''
+        
 def wheel(pos):
     # Generate rainbow colors across 0-255 positions.
     if pos < 85:
