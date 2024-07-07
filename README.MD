@@ -25,6 +25,7 @@ The web interface was based on the MERN stack structure and includes features su
 * Username: DEMO
 * Password: DEMO
 * Demo users can't edit their profile for obvious reasons, but you can still test out the conversation features
+  * Newly registered users need to be activated by an admin so outside testing is limited to the demo account
 * <a href="https://github.com/MattHua04/AI_Chatbot_Frontend">Frontend Repo</a>
 * <a href="https://github.com/MattHua04/AI_Chatbot_Backend">Backend Repo</a>
 <p align="center">
