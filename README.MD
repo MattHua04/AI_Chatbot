@@ -6,7 +6,7 @@
 <p>
 Voice assistant capable of responding to complex prompts and satisfying music requests received through speech or remotely accessible web interface. Includes accessories such as verbal, textual, and tactile input options to manipulate device settings (volume, sleep, reboot, shutdown), conversation flow (resetting memory, verbal response termination), and music playback (pause, resume, previous, next).
 
-The web interface was based on the MERN stack structure and includes features such as secure user authentication and login using password encryption and JWT access tokens, special interface options for admins (activating user accounts, deleting users, music playback control, voice assistant volume manipulation, song search suggestions), creating multiple conversation threads, and full-screen conversation mode. Both the frontend and backend were hosted on EC2 instances, request routing was handled using Route 53, and access over HTTPS was enabled by Caddy.
+The web interface was based on the MERN stack structure and includes features such as secure user authentication and login using password encryption and JWT access tokens, special interface options for admins (activating user accounts, deleting users, music playback control, voice assistant volume manipulation, song search suggestions), creating multiple conversation threads, and full-screen conversation mode. Both the frontend and backend were hosted on ~~EC2 instances~~ the voice assistant itself (RPi), request routing was handled using Route 53, and access over HTTPS was enabled by Caddy.
 </p>
 
 ## Requirements:
@@ -17,7 +17,8 @@ The web interface was based on the MERN stack structure and includes features su
   * Speaker HAT
   * Custom 3D printed case
 * Web Interface
-  * 2 EC2 instances (kept crashing with one due to limited specs with free tier)
+  * ~~2 EC2 instances (kept crashing with one due to limited specs with free tier)~~
+    * Switched to hosting both frontend and backend on RPi for convenience
   * 1 Route 53 hosted zone (routes for frontend and backend EC2 instances)
 
 ## Demo:
