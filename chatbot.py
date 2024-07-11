@@ -376,10 +376,10 @@ def sendPrompt(messages):
     )
     return response.choices[0].message.content
 
-def postPromptResponse(messages, conversation, conversations, compressed=False):
+def postPromptResponse(messages, conversation, conversations):
     MAX_CONTENT_SIZE = 16000
     id = conversation["_id"]
-    content = conversation["content"] if not compressed else conversation["compressed_content"]
+    content = messages
     messages = copy.deepcopy(content)
     messages[-1][1] = "(If your answer contains a math equation format it in LateX)\n" + messages[-1][1]
     # Convert content to openai format
