@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import math
 import time
 import copy
@@ -375,23 +376,34 @@ def sendPrompt(messages):
     )
     return response.choices[0].message.content
 
-def postPromptResponse(messages, conversation, conversations):
+def postPromptResponse(messages, conversation, conversations, compressed=False):
+    MAX_CONTENT_SIZE = 16000
     id = conversation["_id"]
-    content = conversation["content"]
+    content = conversation["content"] if not compressed else conversation["compressed_content"]
     messages = copy.deepcopy(content)
     messages[-1][1] = "(If your answer contains a math equation format it in LateX)\n" + messages[-1][1]
     # Convert content to openai format
     messages = [{"role": "assistant" if message[0] == "AI" else "user", "content": message[1]} for message in messages]
     updated_content = copy.deepcopy(content)
     updated_content.append(["AI", "..."])
-    conversations.update_one({"_id": id}, {"$set": {"content": updated_content}})
+    # Compress content before updating document in MongoDB
+    should_compress = sys.getsizeof(content) > MAX_CONTENT_SIZE
+    if should_compress: updated_content = compress_content(updated_content)
+    if should_compress:
+        conversations.update_one({"_id": id}, {"$set": {"content": [], "compressed_content": updated_content}})
+    else:
+        conversations.update_one({"_id": id}, {"$set": {"content": updated_content, "compressed_content": ''}})
     # Send prompt to OpenAI
     response = sendPrompt(messages)
     updated_content = copy.deepcopy(content)
     updated_content.append(["AI", response])
     # Compress content before updating document in MongoDB
-    updated_content = compress_content(updated_content)
-    conversations.update_one({"_id": id}, {"$set": {"content": updated_content}})
+    should_compress = sys.getsizeof(content) > MAX_CONTENT_SIZE
+    if should_compress: updated_content = compress_content(updated_content)
+    if should_compress:
+        conversations.update_one({"_id": id}, {"$set": {"content": [], "compressed_content": updated_content}})
+    else:
+        conversations.update_one({"_id": id}, {"$set": {"content": updated_content, "compressed_content": ''}})
 
 def findRemotePrompts(sp, pixels, lightsUsageStatus, sleepLightsState):
     # Remote conversation memory
@@ -409,10 +421,16 @@ def findRemotePrompts(sp, pixels, lightsUsageStatus, sleepLightsState):
                 # Decompress content and filter conversations with the last message from "User"
                 conversationQueue = []
                 for conversation in all_conversations:
-                    if conversation['content'] is not None:
-                        conversation['content'] = decompress_content(conversation['content'])
-                        if conversation['content'] and len(conversation['content']) > 0:
-                            last_message_owner = conversation['content'][-1][0]
+                    # Check for uncompressed conversations
+                    if len(conversation['content']) > 0:
+                        last_message_owner = conversation['content'][-1][0]
+                        if last_message_owner == "User":
+                            conversationQueue.append(conversation)
+                    # Check for compressed conversations
+                    elif conversation['compressed_content'] != '':
+                        conversation['compressed_content'] = decompress_content(conversation['compressed_content'])
+                        if conversation['compressed_content'] and len(conversation['compressed_content']) > 0:
+                            last_message_owner = conversation['compressed_content'][-1][0]
                             if last_message_owner == "User":
                                 conversationQueue.append(conversation)
             except:
@@ -423,7 +441,7 @@ def findRemotePrompts(sp, pixels, lightsUsageStatus, sleepLightsState):
             # Check if each prompt has a response given
             threads = []
             for conversation in conversationQueue:
-                remoteMessages = conversation['content']
+                remoteMessages = conversation['content'] if len(conversation['content']) > 0 else conversation['compressed_content']
                 t = Thread(target=postPromptResponse, args=(remoteMessages, conversation, conversations))
                 threads.append(t)
                 t.start()
