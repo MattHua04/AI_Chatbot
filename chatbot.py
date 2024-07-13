@@ -387,7 +387,7 @@ def postPromptResponse(messages, conversation, conversations):
     updated_content = copy.deepcopy(content)
     updated_content.append(["AI", "..."])
     # Compress content before updating document in MongoDB
-    should_compress = sys.getsizeof(content) > MAX_CONTENT_SIZE
+    should_compress = sys.getsizeof(json.dumps(updated_content)) > MAX_CONTENT_SIZE
     if should_compress: updated_content = compress_content(updated_content)
     if should_compress:
         conversations.update_one({"_id": id}, {"$set": {"content": [], "compressed_content": updated_content}})
@@ -398,7 +398,7 @@ def postPromptResponse(messages, conversation, conversations):
     updated_content = copy.deepcopy(content)
     updated_content.append(["AI", response])
     # Compress content before updating document in MongoDB
-    should_compress = sys.getsizeof(content) > MAX_CONTENT_SIZE
+    should_compress = sys.getsizeof(json.dumps(updated_content)) > MAX_CONTENT_SIZE
     if should_compress: updated_content = compress_content(updated_content)
     if should_compress:
         conversations.update_one({"_id": id}, {"$set": {"content": [], "compressed_content": updated_content}})
