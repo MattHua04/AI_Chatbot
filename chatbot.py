@@ -371,7 +371,7 @@ def sendPrompt(messages):
     messages = cropToMeetMaxTokens(messages)
     client = OpenAI(api_key="OpenAIKey")
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
+        model="gpt-4.0-mini",
         messages=messages
     )
     return response.choices[0].message.content
@@ -1024,7 +1024,7 @@ def manageSongRequests(sp):
                     pass
                 
 def count_tokens(messages):
-    encoder = tiktoken.encoding_for_model("gpt-3.5-turbo")
+    encoder = tiktoken.encoding_for_model("gpt-4.0-mini")
     total_tokens = 0
     for message in messages:
         message_tokens = encoder.encode(message["content"])
@@ -1032,7 +1032,7 @@ def count_tokens(messages):
     return total_tokens
 
 def cropToMeetMaxTokens(messages):
-    # Maximum tokens for the gpt-3.5-turbo model
+    # Maximum tokens for the gpt-4.0-mini model
     MAX_TOKENS = 16385 * 0.8
     # Count tokens and remove oldest messages if needed
     while count_tokens(messages) > MAX_TOKENS:
@@ -1531,7 +1531,7 @@ if __name__ == "__main__":
         messages.append({"role": "user", "content": text})
         messages = cropToMeetMaxTokens(messages)
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo", messages=messages
+            model="gpt-4.0-mini", messages=messages
         )
         responseText = response.choices[0].message.content
         # Add response to conversation memory
