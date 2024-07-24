@@ -1025,7 +1025,7 @@ def manageSongRequests(sp):
                     pass
                 
 def count_tokens(messages):
-    encoder = tiktoken.encoding_for_model(MODEL)
+    encoder = tiktoken.encoding_for_model(TOKENIZER_MODEL)
     total_tokens = 0
     for message in messages:
         message_tokens = encoder.encode(message["content"])
