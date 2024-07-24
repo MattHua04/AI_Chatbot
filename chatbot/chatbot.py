@@ -371,7 +371,7 @@ def sendPrompt(messages):
     systemMessage = [{"role": "system",
                       "content": "You are a helpful assistant that will answer all the user's prompts to the best of your abilities. If your answer contains a math equation please format it in LateX"}]
     messages = cropToMeetMaxTokens(messages)
-    client = OpenAI(api_key=OPENAI_SECRET)
+    client = OpenAI(api_key=GROQ_SECRET, base_url=GROQ_BASE_URL)
     response = client.chat.completions.create(
         model=MODEL,
         messages=systemMessage + messages
@@ -1531,7 +1531,7 @@ if __name__ == "__main__":
         print("\033[KMe: " + text)
 
         # Send prompt to ChatGPT
-        client = OpenAI(api_key=OPENAI_SECRET)
+        client = OpenAI(api_key=GROQ_SECRET, base_url=GROQ_BASE_URL)
         messages.append({"role": "user", "content": text})
         messages = cropToMeetMaxTokens(messages)
         response = client.chat.completions.create(
