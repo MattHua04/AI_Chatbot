@@ -12,10 +12,10 @@ import spotipy
 import tiktoken
 import alsaaudio
 import sounddevice
-import numpy as np
+from config import *
 from gtts import gTTS
-from rpi_ws281x import *
 import RPi.GPIO as GPIO
+from rpi_ws281x import *
 from openai import OpenAI
 from mutagen.mp3 import MP3
 from spotipy.oauth2 import *
@@ -73,7 +73,7 @@ def listenForKeyWord(
             words = text.split()
             if len(words) > 10:
                 text = ' '.join(words[1:])
-
+            
             try:
                 text += recorder.recognize_google(speech)
             except:
@@ -260,11 +260,12 @@ def listenForPrompt(recorder, sp, return_dict):
                 # Try to play song on spotify if play is heard
                 try:
                     if text.index("play") == 0:
+                        text = "cancel"
                         try:
                             request = text[5:].lower()
                             auth_manager = SpotifyOAuth(
-                                "clientID",
-                                "clientSecret",
+                                SPOTIFY_CLIENT,
+                                SPOTIFY_SECRET,
                                 "http://localhost:5173/callback",
                                 scope="user-modify-playback-state",
                                 cache_path="/home/matthewpi/Spotify/.cache",
@@ -294,31 +295,30 @@ def listenForPrompt(recorder, sp, return_dict):
                             ).ratio()
                             if closestSong > closestAlbum:
                                 sp.shuffle(
-                                    False, "spotifyDeviceId"
+                                    False, SPOTIFY_DEVICE_ID
                                 )
                                 sp.start_playback(
-                                    "spotifyDeviceId",
+                                    SPOTIFY_DEVICE_ID,
                                     uris=[songUri],
                                     position_ms=0,
                                 )
                                 convertToSpeech("Playing " + songName)
                             else:
                                 sp.start_playback(
-                                    "spotifyDeviceId",
+                                    SPOTIFY_DEVICE_ID,
                                     context_uri=albumUri,
                                     position_ms=0,
                                 )
                                 sp.shuffle(
-                                    True, "spotifyDeviceId"
+                                    True, SPOTIFY_DEVICE_ID
                                 )
                                 sp.next_track(
-                                    "spotifyDeviceId"
+                                    SPOTIFY_DEVICE_ID
                                 )
                                 convertToSpeech("Playing " + albumName)
-                            sp.repeat("off", "spotifyDeviceId")
+                            sp.repeat("off", SPOTIFY_DEVICE_ID)
                         except:
                             convertToSpeech("Unable to find song")
-                        text = "cancel"
                         break
                 except:
                     pass
@@ -368,11 +368,13 @@ def respond(responseSentences):
         fileLen = audioFile.info.length
 
 def sendPrompt(messages):
+    systemMessage = [{"role": "system",
+                      "content": "You are a helpful assistant that will answer all the user's prompts to the best of your abilities. If your answer contains a math equation please format it in LateX"}]
     messages = cropToMeetMaxTokens(messages)
-    client = OpenAI(api_key="OpenAIKey")
+    client = OpenAI(api_key=OPENAI_SECRET)
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=messages
+        model=MODEL,
+        messages=systemMessage + messages
     )
     return response.choices[0].message.content
 
@@ -381,7 +383,6 @@ def postPromptResponse(messages, conversation, conversations):
     id = conversation["_id"]
     content = messages
     messages = copy.deepcopy(content)
-    messages[-1][1] = "(If your answer contains a math equation format it in LateX)\n" + messages[-1][1]
     # Convert content to openai format
     messages = [{"role": "assistant" if message[0] == "AI" else "user", "content": message[1]} for message in messages]
     updated_content = copy.deepcopy(content)
@@ -409,7 +410,7 @@ def findRemotePrompts(sp, pixels, lightsUsageStatus, sleepLightsState):
     # Remote conversation memory
     remoteMessages = []
     # Connect to MongoDB
-    db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+    db = MongoClient(MDB_CONN_STR, tlsCAFile=certifi.where())['test']
     conversations = db["conversations"]
     
     while True:
@@ -434,7 +435,7 @@ def findRemotePrompts(sp, pixels, lightsUsageStatus, sleepLightsState):
                             if last_message_owner == "User":
                                 conversationQueue.append(conversation)
             except:
-                db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+                db = MongoClient(MDB_CONN_STR, tlsCAFile=certifi.where())['test']
                 conversations = db["conversations"]
         
         try:
@@ -465,7 +466,7 @@ def compress_content(content):
         return base64.b64encode(compressed_content).decode('utf-8')
     except:
         return ''
-        
+
 def wheel(pos):
     # Generate rainbow colors across 0-255 positions.
     if pos < 85:
@@ -607,8 +608,8 @@ def spotifyAuth():
     while True:
         time.sleep(60)
         auth_manager = SpotifyOAuth(
-            "clientID",
-            "clientSecret",
+            SPOTIFY_CLIENT,
+            SPOTIFY_SECRET,
             "http://localhost:5173/callback",
             scope="user-modify-playback-state",
             cache_path="/home/matthewpi/Spotify/.cache",
@@ -618,7 +619,7 @@ def spotifyAuth():
         rpiOnline = False
         devices = sp.devices()['devices']
         for device in devices:
-            if device['id'] == "06c55ec62f492429c6ebbf38fc814d5a7382386f":
+            if device['id'] == SPOTIFY_DEVICE_ID:
                 rpiOnline = True
                 break
         if not rpiOnline:
@@ -675,7 +676,7 @@ def volControl(
     sleepLightsState,
     currentColor,
 ):
-    db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+    db = MongoClient(MDB_CONN_STR, tlsCAFile=certifi.where())['test']
     stateCol = db["spotifies"]
     currentVol = -1
     terminateVolLights = Queue()
@@ -692,10 +693,10 @@ def volControl(
             try:
                 state = stateCol.find_one()
             except:
-                db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+                db = MongoClient(MDB_CONN_STR, tlsCAFile=certifi.where())['test']
                 stateCol = db["spotifies"]
                 state = stateCol.find_one()
-        
+
         # Set volume
         requestVol = state['volume']
         if currentVol != requestVol:
@@ -881,7 +882,7 @@ def splitIntoSentences(text: str) -> list[str]:
 
 def manageSongRequests(sp):
     lastCall = time.time()
-    db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+    db = MongoClient(MDB_CONN_STR, tlsCAFile=certifi.where())['test']
     stateCol = db["spotifies"]
     previousSearch = ''
     search = ''
@@ -893,10 +894,10 @@ def manageSongRequests(sp):
             try:
                 state = stateCol.find_one()
             except:
-                db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+                db = MongoClient(MDB_CONN_STR, tlsCAFile=certifi.where())['test']
                 stateCol = db["spotifies"]
                 state = stateCol.find_one()
-        
+                
         # Get search results for the user's input
         previousSearch = search
         search = state['input']
@@ -907,7 +908,7 @@ def manageSongRequests(sp):
                 formattedPlaylists = []
                 for playlist in playlists:
                     formattedPlaylists.append([playlist['name'], playlist['uri'], playlist['images'][0]['url']])
-                
+
                 tracks = searchResults['tracks']['items']
                 formattedTracks = []
                 for track in tracks:
@@ -927,16 +928,16 @@ def manageSongRequests(sp):
                 stateCol.update_one(state, {'$set': {'currentSong': requestSong, 'songRequest': ['', ''], 'playState': 1, 'playControl': 0}})
                 if 'playlist' in requestSong[1]:
                     sp.start_playback(
-                        "spotifyDeviceId",
+                        SPOTIFY_DEVICE_ID,
                         context_uri=requestSong[1],
                         position_ms=0,
                     )
-                    sp.shuffle(True, "spotifyDeviceId")
-                    sp.next_track("spotifyDeviceId")
+                    sp.shuffle(True, SPOTIFY_DEVICE_ID)
+                    sp.next_track(SPOTIFY_DEVICE_ID)
                 elif 'track' in requestSong[1]:
-                    sp.shuffle(False, "spotifyDeviceId")
+                    sp.shuffle(False, SPOTIFY_DEVICE_ID)
                     sp.start_playback(
-                        "spotifyDeviceId",
+                        SPOTIFY_DEVICE_ID,
                         uris=[requestSong[1]],
                         position_ms=0,
                     )
@@ -972,19 +973,19 @@ def manageSongRequests(sp):
             try:
                 if requestPlayState == 0:
                     sp.transfer_playback(
-                        "spotifyDeviceId",
+                        SPOTIFY_DEVICE_ID,
                         force_play=False,
                     )
                     sp.pause_playback(
-                        "spotifyDeviceId"
+                        SPOTIFY_DEVICE_ID
                     )
                 elif requestPlayState == 1:
                     sp.transfer_playback(
-                        "spotifyDeviceId",
+                        SPOTIFY_DEVICE_ID,
                         force_play=True,
                     )
                     # sp.start_playback(
-                    #     "spotifyDeviceId"
+                    #     SPOTIFY_DEVICE_ID
                     # )
             except:
                 pass
@@ -995,14 +996,14 @@ def manageSongRequests(sp):
             if requestControlPlayState == 1:
                 try:
                     sp.transfer_playback(
-                        "spotifyDeviceId",
+                        SPOTIFY_DEVICE_ID,
                         force_play=True,
                     )
                     sp.next_track(
-                        "spotifyDeviceId"
+                        SPOTIFY_DEVICE_ID
                     )
                     # sp.start_playback(
-                    #     "spotifyDeviceId"
+                    #     SPOTIFY_DEVICE_ID
                     # )
                     stateCol.update_one(state, {'$set': {'controlPlayState': 0, 'playState': 1}})
                 except:
@@ -1010,21 +1011,21 @@ def manageSongRequests(sp):
             elif requestControlPlayState == -1:
                 try:
                     sp.transfer_playback(
-                        "spotifyDeviceId",
+                        SPOTIFY_DEVICE_ID,
                         force_play=True,
                     )
                     sp.previous_track(
-                        "spotifyDeviceId"
+                        SPOTIFY_DEVICE_ID
                     )
                     # sp.start_playback(
-                    #     "spotifyDeviceId"
+                    #     SPOTIFY_DEVICE_ID
                     # )
                     stateCol.update_one(state, {'$set': {'controlPlayState': 0, 'playState': 1}})
                 except:
                     pass
                 
 def count_tokens(messages):
-    encoder = tiktoken.encoding_for_model("gpt-4o-mini")
+    encoder = tiktoken.encoding_for_model(MODEL)
     total_tokens = 0
     for message in messages:
         message_tokens = encoder.encode(message["content"])
@@ -1039,12 +1040,13 @@ def cropToMeetMaxTokens(messages):
         messages.pop(0)
     return messages
 
+
 if __name__ == "__main__":
     # Setup Caddy
     os.system("caddy stop")
     os.system("sudo systemctl restart caddy")
     # Connect to MongoDB
-    db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+    db = MongoClient(MDB_CONN_STR, tlsCAFile=certifi.where())['test']
     stateCol = db["spotifies"]
     # List of all multiprocesses
     processes = []
@@ -1087,8 +1089,8 @@ if __name__ == "__main__":
     currentColor = Queue()
     # Setup Spotify
     auth_manager = SpotifyOAuth(
-        "clientID",
-        "clientSecret",
+        SPOTIFY_CLIENT,
+        SPOTIFY_SECRET,
         "http://localhost:5173/callback",
         scope="user-modify-playback-state",
         cache_path="/home/matthewpi/Spotify/.cache",
@@ -1105,8 +1107,8 @@ if __name__ == "__main__":
     # Volume control requirements
     audio = alsaaudio.Mixer("Speaker")
     audio.setvolume(
-        round(math.log((50) * 25 / 19) / 0.0488)
-    )  # Default volume level to 50
+        round(math.log((stateCol.find_one()['volume']) * 25 / 19) / 0.0488)
+    )  # Default volume level to database volume
     volLevelVerbal = Queue()
     volLevelButton = Queue()
     volQueue = Queue()
@@ -1127,7 +1129,7 @@ if __name__ == "__main__":
     processes.append(controlVol)
     controlVol.start()
     # Set up spotify manager
-    spotifyManager = Process(target=manageSongRequests, args=(sp))
+    spotifyManager = Process(target=manageSongRequests, args=(sp,))
     processes.append(spotifyManager)
     spotifyManager.start()
     # Set up microphone input
@@ -1273,8 +1275,8 @@ if __name__ == "__main__":
                                     # Skip if triple clicked
                                     if triple:
                                         # auth_manager = SpotifyOAuth(
-                                        #     "clientID",
-                                        #     "clientSecret",
+                                        #     SPOTIFY_CLIENT,
+                                        #     SPOTIFY_SECRET,
                                         #     "http://localhost:5173/callback",
                                         #     scope="user-modify-playback-state",
                                         #     cache_path="/home/matthewpi/Spotify/.cache",
@@ -1282,11 +1284,11 @@ if __name__ == "__main__":
                                         # sp = spotipy.Spotify(auth_manager=auth_manager)
                                         # try:
                                         #     sp.next_track(
-                                        #         "spotifyDeviceId"
+                                        #         SPOTIFY_DEVICE_ID
                                         #     )
                                         # except:
                                         #     pass
-                                        db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+                                        db = MongoClient(MDB_CONN_STR, tlsCAFile=certifi.where())['test']
                                         stateCol = db["spotifies"]
                                         state = stateCol.find_one()
                                         stateCol.update_one(state, {'$set': {'controlPlayState': 1}})
@@ -1295,8 +1297,8 @@ if __name__ == "__main__":
                                     elif double:
                                         try:
                                             auth_manager = SpotifyOAuth(
-                                                "clientID",
-                                                "clientSecret",
+                                                SPOTIFY_CLIENT,
+                                                SPOTIFY_SECRET,
                                                 "http://localhost:5173/callback",
                                                 scope="user-modify-playback-state",
                                                 cache_path="/home/matthewpi/Spotify/.cache",
@@ -1305,13 +1307,13 @@ if __name__ == "__main__":
                                                 auth_manager=auth_manager
                                             )
                                             if sp.currently_playing()["is_playing"]:
-                                                db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+                                                db = MongoClient(MDB_CONN_STR, tlsCAFile=certifi.where())['test']
                                                 stateCol = db["spotifies"]
                                                 state = stateCol.find_one()
                                                 stateCol.update_one(state, {'$set': {'playState': 0}})
                                                 # auth_manager = SpotifyOAuth(
-                                                #     "clientID",
-                                                #     "clientSecret",
+                                                #     SPOTIFY_CLIENT,
+                                                #     SPOTIFY_SECRET,
                                                 #     "http://localhost:5173/callback",
                                                 #     scope="user-modify-playback-state",
                                                 #     cache_path="/home/matthewpi/Spotify/.cache",
@@ -1320,17 +1322,17 @@ if __name__ == "__main__":
                                                 #     auth_manager=auth_manager
                                                 # )
                                                 # sp.pause_playback(
-                                                #     "spotifyDeviceId"
+                                                #     SPOTIFY_DEVICE_ID
                                                 # )
                                                 print("Pausing . . .")
                                             else:
-                                                db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+                                                db = MongoClient(MDB_CONN_STR, tlsCAFile=certifi.where())['test']
                                                 stateCol = db["spotifies"]
                                                 state = stateCol.find_one()
                                                 stateCol.update_one(state, {'$set': {'playState': 1}})
                                                 # auth_manager = SpotifyOAuth(
-                                                #     "clientID",
-                                                #     "clientSecret",
+                                                #     SPOTIFY_CLIENT,
+                                                #     SPOTIFY_SECRET,
                                                 #     "http://localhost:5173/callback",
                                                 #     scope="user-modify-playback-state",
                                                 #     cache_path="/home/matthewpi/Spotify/.cache",
@@ -1339,7 +1341,7 @@ if __name__ == "__main__":
                                                 #     auth_manager=auth_manager
                                                 # )
                                                 # sp.start_playback(
-                                                #     "spotifyDeviceId"
+                                                #     SPOTIFY_DEVICE_ID
                                                 # )
                                                 print("Resuming . . .")
                                         except:
@@ -1367,42 +1369,42 @@ if __name__ == "__main__":
                             break
                     # Skip if triple clicked
                     if triple:
+                        db = MongoClient(MDB_CONN_STR, tlsCAFile=certifi.where())['test']
+                        stateCol = db["spotifies"]
+                        state = stateCol.find_one()
+                        stateCol.update_one(state, {'$set': {'controlPlayState': 1}})
                         # auth_manager = SpotifyOAuth(
-                        #     "clientID",
-                        #     "clientSecret",
+                        #     SPOTIFY_CLIENT,
+                        #     SPOTIFY_SECRET,
                         #     "http://localhost:5173/callback",
                         #     scope="user-modify-playback-state",
                         #     cache_path="/home/matthewpi/Spotify/.cache",
                         # )
                         # sp = spotipy.Spotify(auth_manager=auth_manager)
                         # try:
-                        #     sp.next_track("spotifyDeviceId")
+                        #     sp.next_track(SPOTIFY_DEVICE_ID)
                         # except:
                         #     pass
-                        db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
-                        stateCol = db["spotifies"]
-                        state = stateCol.find_one()
-                        stateCol.update_one(state, {'$set': {'controlPlayState': 1}})
                         print("Skipping song . . .")
                     # Pause/Resume if double clicked
                     elif double:
                         try:
                             auth_manager = SpotifyOAuth(
-                                "clientID",
-                                "clientSecret",
+                                SPOTIFY_CLIENT,
+                                SPOTIFY_SECRET,
                                 "http://localhost:5173/callback",
                                 scope="user-modify-playback-state",
                                 cache_path="/home/matthewpi/Spotify/.cache",
                             )
                             sp = spotipy.Spotify(auth_manager=auth_manager)
                             if sp.currently_playing()["is_playing"]:
-                                db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+                                db = MongoClient(MDB_CONN_STR, tlsCAFile=certifi.where())['test']
                                 stateCol = db["spotifies"]
                                 state = stateCol.find_one()
                                 stateCol.update_one(state, {'$set': {'playState': 0}})
                                 # auth_manager = SpotifyOAuth(
-                                #     "clientID",
-                                #     "clientSecret",
+                                #     SPOTIFY_CLIENT,
+                                #     SPOTIFY_SECRET,
                                 #     "http://localhost:5173/callback",
                                 #     scope="user-modify-playback-state",
                                 #     cache_path="/home/matthewpi/Spotify/.cache",
@@ -1410,19 +1412,19 @@ if __name__ == "__main__":
                                 # sp = spotipy.Spotify(auth_manager=auth_manager)
                                 # try:
                                 #     sp.pause_playback(
-                                #         "spotifyDeviceId"
+                                #         SPOTIFY_DEVICE_ID
                                 #     )
                                 # except:
                                 #     pass
                                 print("Pausing . . .")
                             else:
-                                db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+                                db = MongoClient(MDB_CONN_STR, tlsCAFile=certifi.where())['test']
                                 stateCol = db["spotifies"]
                                 state = stateCol.find_one()
                                 stateCol.update_one(state, {'$set': {'playState': 1}})
                                 # auth_manager = SpotifyOAuth(
-                                #     "clientID",
-                                #     "clientSecret",
+                                #     SPOTIFY_CLIENT,
+                                #     SPOTIFY_SECRET,
                                 #     "http://localhost:5173/callback",
                                 #     scope="user-modify-playback-state",
                                 #     cache_path="/home/matthewpi/Spotify/.cache",
@@ -1430,7 +1432,7 @@ if __name__ == "__main__":
                                 # sp = spotipy.Spotify(auth_manager=auth_manager)
                                 # try:
                                 #     sp.start_playback(
-                                #         "spotifyDeviceId"
+                                #         SPOTIFY_DEVICE_ID
                                 #     )
                                 # except:
                                 #     pass
@@ -1457,12 +1459,13 @@ if __name__ == "__main__":
             try:
                 state = stateCol.find_one()
             except:
-                db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+                db = MongoClient(MDB_CONN_STR, tlsCAFile=certifi.where())['test']
                 stateCol = db["spotifies"]
                 state = stateCol.find_one()
         originalState = state['playState'] == 1
         try:
             stateCol.update_one(state, {'$set': {'playState': 0}})
+            # sp.pause_playback(SPOTIFY_DEVICE_ID)
         except:
             pass
         # Turn on lights to signify listening
@@ -1497,8 +1500,8 @@ if __name__ == "__main__":
         if cancelled:
             # Resume any songs that were paused while listening for prompt
             # auth_manager = SpotifyOAuth(
-            #     "clientID",
-            #     "clientSecret",
+            #     SPOTIFY_CLIENT,
+            #     SPOTIFY_SECRET,
             #     "http://localhost:5173/callback",
             #     scope="user-modify-playback-state",
             #     cache_path="/home/matthewpi/Spotify/.cache",
@@ -1510,11 +1513,12 @@ if __name__ == "__main__":
                     try:
                         state = stateCol.find_one()
                     except:
-                        db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+                        db = MongoClient(MDB_CONN_STR, tlsCAFile=certifi.where())['test']
                         stateCol = db["spotifies"]
                         state = stateCol.find_one()
                 try:
                     stateCol.update_one(state, {'$set': {'playState': 1}})
+                    # sp.start_playback(SPOTIFY_DEVICE_ID)
                 except:
                     pass
             continue
@@ -1527,11 +1531,11 @@ if __name__ == "__main__":
         print("\033[KMe: " + text)
 
         # Send prompt to ChatGPT
-        client = OpenAI(api_key="OpenAIKey")
+        client = OpenAI(api_key=OPENAI_SECRET)
         messages.append({"role": "user", "content": text})
         messages = cropToMeetMaxTokens(messages)
         response = client.chat.completions.create(
-            model="gpt-4o-mini", messages=messages
+            model=MODEL, messages=messages
         )
         responseText = response.choices[0].message.content
         # Add response to conversation memory
@@ -1561,8 +1565,8 @@ if __name__ == "__main__":
         onOff.put("lightsOff")
         # Resume any songs that were paused while listening for prompt
         # auth_manager = SpotifyOAuth(
-        #     "clientID",
-        #     "clientSecret",
+        #     SPOTIFY_CLIENT,
+        #     SPOTIFY_SECRET,
         #     "http://localhost:5173/callback",
         #     scope="user-modify-playback-state",
         #     cache_path="/home/matthewpi/Spotify/.cache",
@@ -1574,10 +1578,11 @@ if __name__ == "__main__":
                 try:
                     state = stateCol.find_one()
                 except:
-                    db = MongoClient("MongoDBConnectionString", tlsCAFile=certifi.where())['test']
+                    db = MongoClient(MDB_CONN_STR, tlsCAFile=certifi.where())['test']
                     stateCol = db["spotifies"]
                     state = stateCol.find_one()
             try:
                 stateCol.update_one(state, {'$set': {'playState': 1}})
+                # sp.start_playback(SPOTIFY_DEVICE_ID)
             except:
                 pass
