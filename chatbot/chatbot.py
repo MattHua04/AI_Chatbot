@@ -1034,7 +1034,7 @@ def count_tokens(messages):
 
 def cropToMeetMaxTokens(messages):
     # Maximum tokens for the gpt-4o-mini model
-    MAX_TOKENS = 16385 * 0.8
+    MAX_TOKENS = 128000 * 0.8
     # Count tokens and remove oldest messages if needed
     while count_tokens(messages) > MAX_TOKENS:
         messages.pop(0)
