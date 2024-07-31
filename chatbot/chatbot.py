@@ -1,13 +1,16 @@
 import os
 import re
+import io
 import sys
 import math
 import time
 import copy
 import zlib
 import json
+import wave
 import base64
 import certifi
+import pyaudio
 import spotipy
 import tiktoken
 import alsaaudio
@@ -25,8 +28,46 @@ from pymongo import MongoClient
 from difflib import SequenceMatcher
 from multiprocessing import Manager, Process, Queue
 
+def readAudioStream(stream, dataQueue):
+    while True:
+        data = stream.read(stream.get_read_available(), exception_on_overflow=False)
+        dataQueue.put(data)
+
+def speechToText(mic, dataQueue):
+    FORMAT = pyaudio.paInt16
+    RATE = 16000
+    # Get audio data from the stream
+    frames = []
+    while not dataQueue.empty():
+        frames.append(dataQueue.get())
+    data = b''.join(frames)
+    # Write to byte buffer
+    audio_buffer = io.BytesIO()
+    wf = wave.open(audio_buffer, 'wb')
+    wf.setnchannels(CHANNELS)
+    wf.setsampwidth(mic.get_sample_size(FORMAT))
+    wf.setframerate(RATE)
+    wf.writeframes(data)
+    wf.close()
+
+    # Rewind the buffer to the beginning so it can be read from
+    audio_buffer.seek(0)
+
+    client = OpenAI(api_key=GROQ_SECRET, base_url=GROQ_BASE_URL)
+    response = client.audio.transcriptions.create(
+        model=S2T_MODEL,
+        file=("_.wav", audio_buffer.read()),
+        prompt="Specify context or spelling",
+        language="en",
+        temperature=0.0
+    )
+    return response.text
+
 def listenForKeyWord(
-    recorder,
+    # recorder,
+    mic,
+    micStream,
+    dataQueue,
     audio,
     pixels,
     name,
@@ -65,19 +106,23 @@ def listenForKeyWord(
         "twenty": 20,
         "max": 100,
     }
-    with sr.Microphone() as source:
+    # with sr.Microphone() as source:
+    with micStream as source:
+        # Clear the audio buffer
+        source.read(source.get_read_available(), exception_on_overflow=False)
         while "hey " + name.lower() not in text.lower():
-            speech = recorder.listen(source, phrase_time_limit=3)
+            text.append(speechToText(mic, source, dataQueue))
+            # speech = recorder.listen(source, phrase_time_limit=3)
             
             # Trim text memory
             words = text.split()
             if len(words) > 10:
                 text = ' '.join(words[1:])
             
-            try:
-                text += recorder.recognize_google(speech)
-            except:
-                pass
+            # try:
+            #     text += recorder.recognize_google(speech)
+            # except:
+            #     pass
             # Reset conversation memory when "reset" is heard
             if "reset" in text.lower():
                 messages = []
@@ -373,7 +418,7 @@ def sendPrompt(messages):
     messages = cropToMeetMaxTokens(messages)
     client = OpenAI(api_key=GROQ_SECRET, base_url=GROQ_BASE_URL)
     response = client.chat.completions.create(
-        model=MODEL,
+        model=REASONING_MODEL,
         messages=systemMessage + messages
     )
     return response.choices[0].message.content
@@ -1133,7 +1178,23 @@ if __name__ == "__main__":
     processes.append(spotifyManager)
     spotifyManager.start()
     # Set up microphone input
-    recorder = sr.Recognizer()
+    # recorder = sr.Recognizer()
+    FORMAT = pyaudio.paInt16  # Audio format
+    CHANNELS = 1              # Number of audio channels (mono)
+    RATE = 16000              # Sample rate (samples per second)
+    CHUNK = 1024              # Buffer size
+    # Initialize PyAudio
+    mic = pyaudio.PyAudio()
+    # Open stream for recording
+    micStream = mic.open(format=FORMAT,
+                        channels=CHANNELS,
+                        rate=RATE,
+                        input=True,
+                        frames_per_buffer=CHUNK)
+    dataQueue = Queue()
+    recordMic = Process(target=readAudioStream, args=(micStream, dataQueue))
+    processes.append(recordMic)
+    recordMic.start()
     # Conversation memory
     messages = []
     # Set name that chatbot listens for
@@ -1160,7 +1221,10 @@ if __name__ == "__main__":
         listen = Process(
             target=listenForKeyWord,
             args=(
-                recorder,
+                # recorder,
+                mic,
+                micStream,
+                dataQueue,
                 audio,
                 pixels,
                 name,
@@ -1535,7 +1599,7 @@ if __name__ == "__main__":
         messages.append({"role": "user", "content": text})
         messages = cropToMeetMaxTokens(messages)
         response = client.chat.completions.create(
-            model=MODEL, messages=messages
+            model=REASONING_MODEL, messages=messages
         )
         responseText = response.choices[0].message.content
         # Add response to conversation memory
