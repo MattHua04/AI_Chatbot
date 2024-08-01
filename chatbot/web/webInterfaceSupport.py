@@ -5,13 +5,12 @@ import zlib
 import json
 import base64
 import certifi
-import tiktoken
 from config import *
 from rpi_ws281x import *
 from threading import Thread
 from pymongo import MongoClient
-from chatbot.ai.aiTools import *
 from multiprocessing import Process
+from ai.aiTools import *
 
 def webInit(sp, pixels, lightsUsageStatus, sleepLightsState):
     # Setup Caddy
@@ -116,19 +115,3 @@ def compress_content(content):
         return base64.b64encode(compressed_content).decode('utf-8')
     except:
         return ''
-                
-def count_tokens(messages):
-    encoder = tiktoken.encoding_for_model(TOKENIZER_MODEL)
-    total_tokens = 0
-    for message in messages:
-        message_tokens = encoder.encode(message["content"])
-        total_tokens += len(message_tokens) + len(encoder.encode(message["role"]))
-    return total_tokens
-
-def cropToMeetMaxTokens(messages):
-    # Maximum tokens for the gpt-4o-mini model
-    MAX_TOKENS = 16385 * 0.8
-    # Count tokens and remove oldest messages if needed
-    while count_tokens(messages) > MAX_TOKENS:
-        messages.pop(0)
-    return messages

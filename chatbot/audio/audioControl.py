@@ -6,10 +6,10 @@ from config import *
 import RPi.GPIO as GPIO
 from pymongo import MongoClient
 from multiprocessing import Process, Queue
-from chatbot.lights.ringLight import *
-from chatbot.audio.audioOut import *
+from lights.ringLight import *
+from audio.audioOut import *
 
-def volControlInit(pixels, lightsUsageStatus, sleepLightsState, currentColor):
+def volControlInit(stateCol, pixels, lightsUsageStatus, sleepLightsState, currentColor):
     # Volume control requirements
     audio = alsaaudio.Mixer("Speaker")
     audio.setvolume(

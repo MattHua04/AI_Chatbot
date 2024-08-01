@@ -9,14 +9,14 @@ from openai import OpenAI
 from spotipy.oauth2 import *
 from pymongo import MongoClient
 from multiprocessing import Manager, Process, Queue
-from chatbot.ai.aiTools import *
-from chatbot.audio.audioIn import *
-from chatbot.audio.audioOut import *
-from chatbot.audio.audioControl import *
-from chatbot.lights.ringLight import *
-from chatbot.music.spotifySupport import *
-from chatbot.tactile.inputHandler import *
-from chatbot.web.webInterfaceSupport import *
+from ai.aiTools import *
+from audio.audioIn import *
+from audio.audioOut import *
+from audio.audioControl import *
+from lights.ringLight import *
+from music.spotifySupport import *
+from tactile.inputHandler import *
+from web.webInterfaceSupport import *
 
 if __name__ == "__main__":
     # Init
@@ -25,11 +25,11 @@ if __name__ == "__main__":
     pixels, lightsUsageStatus, sleepLightsState, currentColor, onOff = lightsInit()
     sp = spotifyInit()
     stateCol = webInit(sp, pixels, lightsUsageStatus, sleepLightsState)
-    audio, volLevelVerbal, volLevelButton, volQueue = volControlInit(pixels, lightsUsageStatus, sleepLightsState, currentColor)
+    audio, volLevelVerbal, volLevelButton, volQueue = volControlInit(stateCol, pixels, lightsUsageStatus, sleepLightsState, currentColor)
     recorder = audioInInit()
     # Conversation memory
     messages = []
-    # Set name that chatbot listens for
+    # Set name that listens for
     name = NAME
     print("Hi, my name is " + name)
     lights = Process(

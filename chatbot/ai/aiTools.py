@@ -1,6 +1,6 @@
+import tiktoken
 from config import *
 from openai import OpenAI
-from chatbot.web.webInterfaceSupport import *
 
 def sendPrompt(
     messages,
@@ -15,3 +15,19 @@ def sendPrompt(
         messages=systemMessage + messages
     )
     return response.choices[0].message.content
+
+def count_tokens(messages):
+    encoder = tiktoken.encoding_for_model(TOKENIZER_MODEL)
+    total_tokens = 0
+    for message in messages:
+        message_tokens = encoder.encode(message["content"])
+        total_tokens += len(message_tokens) + len(encoder.encode(message["role"]))
+    return total_tokens
+
+def cropToMeetMaxTokens(messages):
+    # Maximum tokens for the gpt-4o-mini model
+    MAX_TOKENS = 16385 * 0.8
+    # Count tokens and remove oldest messages if needed
+    while count_tokens(messages) > MAX_TOKENS:
+        messages.pop(0)
+    return messages

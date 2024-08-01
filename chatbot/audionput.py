@@ -1,19 +1,30 @@
+import os
+import re
+import sys
 import math
+import time
+import copy
+import zlib
+import json
+import base64
+import certifi
 import spotipy
+import tiktoken
+import alsaaudio
 import sounddevice
 from config import *
+from gtts import gTTS
+import RPi.GPIO as GPIO
+from rpi_ws281x import *
+from openai import OpenAI
+from mutagen.mp3 import MP3
 from spotipy.oauth2 import *
 from threading import Thread
 import speech_recognition as sr
+from pymongo import MongoClient
+from difflib import SequenceMatcher
 from multiprocessing import Manager, Process, Queue
-from lights.ringLight import *
-from audio.audioOut import *
-from ai.aiTools import *
-
-def audioInInit():
-    # Set up microphone input
-    recorder = sr.Recognizer()
-    return recorder
+from 
 
 def listenForKeyWord(
     recorder,
@@ -25,7 +36,6 @@ def listenForKeyWord(
     volLevelButton,
     volQueue,
     return_dict,
-    lightsUsageStatus,
     sleepLightsState,
 ):
     # Listen for wakeword
@@ -78,6 +88,7 @@ def listenForKeyWord(
                     target=lightsControl,
                     args=(pixels, onOff, lightsUsageStatus, sleepLightsState),
                 )
+                processes.append(lights)
                 lights.start()
                 convertToSpeech("Resetting conversation")
                 onOff.put("lightsOff")
@@ -229,6 +240,7 @@ def listenForKeyWord(
                     target=lightsControl,
                     args=(pixels, onOff, lightsUsageStatus, sleepLightsState),
                 )
+                processes.append(lights)
                 lights.start()
                 convertToSpeech("Rebooting")
                 onOff.put("lightsOff")
