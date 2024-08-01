@@ -1,16 +1,13 @@
 import os
 import re
-import io
 import sys
 import math
 import time
 import copy
 import zlib
 import json
-import wave
 import base64
 import certifi
-import pyaudio
 import spotipy
 import tiktoken
 import alsaaudio
@@ -28,46 +25,8 @@ from pymongo import MongoClient
 from difflib import SequenceMatcher
 from multiprocessing import Manager, Process, Queue
 
-def readAudioStream(stream, dataQueue):
-    while True:
-        data = stream.read(stream.get_read_available(), exception_on_overflow=False)
-        dataQueue.put(data)
-
-def speechToText(mic, dataQueue):
-    FORMAT = pyaudio.paInt16
-    RATE = 16000
-    # Get audio data from the stream
-    frames = []
-    while not dataQueue.empty():
-        frames.append(dataQueue.get())
-    data = b''.join(frames)
-    # Write to byte buffer
-    audio_buffer = io.BytesIO()
-    wf = wave.open(audio_buffer, 'wb')
-    wf.setnchannels(CHANNELS)
-    wf.setsampwidth(mic.get_sample_size(FORMAT))
-    wf.setframerate(RATE)
-    wf.writeframes(data)
-    wf.close()
-
-    # Rewind the buffer to the beginning so it can be read from
-    audio_buffer.seek(0)
-
-    client = OpenAI(api_key=GROQ_SECRET, base_url=GROQ_BASE_URL)
-    response = client.audio.transcriptions.create(
-        model=S2T_MODEL,
-        file=("_.wav", audio_buffer.read()),
-        prompt="Specify context or spelling",
-        language="en",
-        temperature=0.0
-    )
-    return response.text
-
 def listenForKeyWord(
-    # recorder,
-    mic,
-    micStream,
-    dataQueue,
+    recorder,
     audio,
     pixels,
     name,
@@ -106,23 +65,19 @@ def listenForKeyWord(
         "twenty": 20,
         "max": 100,
     }
-    # with sr.Microphone() as source:
-    with micStream as source:
-        # Clear the audio buffer
-        source.read(source.get_read_available(), exception_on_overflow=False)
+    with sr.Microphone() as source:
         while "hey " + name.lower() not in text.lower():
-            text.append(speechToText(mic, source, dataQueue))
-            # speech = recorder.listen(source, phrase_time_limit=3)
+            speech = recorder.listen(source, phrase_time_limit=3)
             
             # Trim text memory
             words = text.split()
             if len(words) > 10:
                 text = ' '.join(words[1:])
-            
-            # try:
-            #     text += recorder.recognize_google(speech)
-            # except:
-            #     pass
+
+            try:
+                text += recorder.recognize_google(speech)
+            except:
+                pass
             # Reset conversation memory when "reset" is heard
             if "reset" in text.lower():
                 messages = []
@@ -305,53 +260,51 @@ def listenForPrompt(recorder, sp, return_dict):
                 # Try to play song on spotify if play is heard
                 try:
                     if text.index("play") == 0:
+                        request = text
                         text = "cancel"
                         try:
-                            request = text[5:].lower()
+                            request = sendPrompt([{"role": "system", "content": request}], "what song or playlist does this user want to play (answer with only the song or playlist title)?", "llama-3.1-8b-instant")
                             auth_manager = SpotifyOAuth(
                                 SPOTIFY_CLIENT,
                                 SPOTIFY_SECRET,
                                 "http://localhost:5173/callback",
                                 scope="user-modify-playback-state",
-                                cache_path="/home/matthewpi/Spotify/.cache",
+                                cache_path="/home/madspi/Spotify/.cache",
                             )
                             sp = spotipy.Spotify(auth_manager=auth_manager)
-                            songs = sp.search(request, 1, 0, "track")["tracks"]["items"]
-                            for track in songs:
-                                if "clean" not in track["name"].lower():
-                                    song = track
-                                    break
-                            albums = sp.search(request, 1, 0, "playlist")["playlists"][
-                                "items"
-                            ]
-                            for playlist in albums:
-                                if "clean" not in playlist["name"].lower():
-                                    album = playlist
-                                    break
-                            songName = song["name"].lower()
-                            albumName = album["name"].lower()
-                            songUri = song["uri"]
-                            albumUri = album["uri"]
-                            closestSong = SequenceMatcher(
-                                None, request, songName
-                            ).ratio()
-                            closestAlbum = SequenceMatcher(
-                                None, request, albumName
-                            ).ratio()
-                            if closestSong > closestAlbum:
+                            results = sp.search(request, 10, 0, "track,playlist")
+                            tracks = results['tracks']['items']
+                            playlists = results['playlists']['items']
+                            all = tracks + playlists
+                            prompt = []
+                            for i, item in enumerate(all):
+                                prompt.append(" ".join([
+                                    f"{i}.",
+                                    f"  (type={item['type']})",
+                                    f"  (title={item['name']})",
+                                    f"  (artists={', '.join([artist['name'] for artist in item.get('artists', [])])})" if 'artists' in item else f"  (owner={item['owner']['display_name']})",
+                                    f"  (popularity={item.get('popularity', 'N/A')})",
+                                    f"  (description={item.get('description', 'N/A')})"
+                                ]))
+                            prompt = '\n'.join(prompt)
+                            choice = sendPrompt([{"role": "system", "content": prompt}], f'which search would the user be most satisfied with given their request of "{request}" (only respond with a single numerical index)?')
+                            choice = all[int(choice)]
+                            name = choice['name']
+                            uri = choice['uri']
+                            type = choice['type']
+                            if type == "track":
                                 sp.shuffle(
                                     False, SPOTIFY_DEVICE_ID
                                 )
                                 sp.start_playback(
                                     SPOTIFY_DEVICE_ID,
-                                    uris=[songUri],
+                                    uris=[uri],
                                     position_ms=0,
                                 )
-                                convertToSpeech("Playing " + songName)
-                            else:
+                            elif type == "playlist":
                                 sp.start_playback(
                                     SPOTIFY_DEVICE_ID,
-                                    context_uri=albumUri,
+                                    context_uri=uri,
                                     position_ms=0,
                                 )
                                 sp.shuffle(
@@ -360,7 +313,7 @@ def listenForPrompt(recorder, sp, return_dict):
                                 sp.next_track(
                                     SPOTIFY_DEVICE_ID
                                 )
-                                convertToSpeech("Playing " + albumName)
+                            convertToSpeech("Playing " + name)
                             sp.repeat("off", SPOTIFY_DEVICE_ID)
                         except:
                             convertToSpeech("Unable to find song")
@@ -412,13 +365,16 @@ def respond(responseSentences):
         audioFile = MP3("output%s.mp3" % ("1" if (fileNum - 1) % 2 == 1 else ""))
         fileLen = audioFile.info.length
 
-def sendPrompt(messages):
-    systemMessage = [{"role": "system",
-                      "content": "You are a helpful assistant that will answer all the user's prompts to the best of your abilities. If your answer contains a math equation please format it in LateX"}]
+def sendPrompt(
+    messages,
+    systemMessage="You are a helpful assistant that will answer all the user's prompts to the best of your abilities. If your answer contains a math equation please format it in LateX",
+    useModel=MODEL
+    ):
+    systemMessage = [{"role": "system", "content": systemMessage}]
     messages = cropToMeetMaxTokens(messages)
     client = OpenAI(api_key=GROQ_SECRET, base_url=GROQ_BASE_URL)
     response = client.chat.completions.create(
-        model=REASONING_MODEL,
+        model=useModel,
         messages=systemMessage + messages
     )
     return response.choices[0].message.content
@@ -657,7 +613,7 @@ def spotifyAuth():
             SPOTIFY_SECRET,
             "http://localhost:5173/callback",
             scope="user-modify-playback-state",
-            cache_path="/home/matthewpi/Spotify/.cache",
+            cache_path="/home/madspi/Spotify/.cache",
         )
         sp = spotipy.Spotify(auth_manager=auth_manager)
         
@@ -1079,7 +1035,7 @@ def count_tokens(messages):
 
 def cropToMeetMaxTokens(messages):
     # Maximum tokens for the gpt-4o-mini model
-    MAX_TOKENS = 128000 * 0.8
+    MAX_TOKENS = 16385 * 0.8
     # Count tokens and remove oldest messages if needed
     while count_tokens(messages) > MAX_TOKENS:
         messages.pop(0)
@@ -1138,7 +1094,7 @@ if __name__ == "__main__":
         SPOTIFY_SECRET,
         "http://localhost:5173/callback",
         scope="user-modify-playback-state",
-        cache_path="/home/matthewpi/Spotify/.cache",
+        cache_path="/home/madspi/Spotify/.cache",
     )
     sp = spotipy.Spotify(auth_manager=auth_manager)
     spAuth = Process(target=spotifyAuth)
@@ -1178,23 +1134,7 @@ if __name__ == "__main__":
     processes.append(spotifyManager)
     spotifyManager.start()
     # Set up microphone input
-    # recorder = sr.Recognizer()
-    FORMAT = pyaudio.paInt16  # Audio format
-    CHANNELS = 1              # Number of audio channels (mono)
-    RATE = 16000              # Sample rate (samples per second)
-    CHUNK = 1024              # Buffer size
-    # Initialize PyAudio
-    mic = pyaudio.PyAudio()
-    # Open stream for recording
-    micStream = mic.open(format=FORMAT,
-                        channels=CHANNELS,
-                        rate=RATE,
-                        input=True,
-                        frames_per_buffer=CHUNK)
-    dataQueue = Queue()
-    recordMic = Process(target=readAudioStream, args=(micStream, dataQueue))
-    processes.append(recordMic)
-    recordMic.start()
+    recorder = sr.Recognizer()
     # Conversation memory
     messages = []
     # Set name that chatbot listens for
@@ -1221,10 +1161,7 @@ if __name__ == "__main__":
         listen = Process(
             target=listenForKeyWord,
             args=(
-                # recorder,
-                mic,
-                micStream,
-                dataQueue,
+                recorder,
                 audio,
                 pixels,
                 name,
@@ -1343,7 +1280,7 @@ if __name__ == "__main__":
                                         #     SPOTIFY_SECRET,
                                         #     "http://localhost:5173/callback",
                                         #     scope="user-modify-playback-state",
-                                        #     cache_path="/home/matthewpi/Spotify/.cache",
+                                        #     cache_path="/home/madspi/Spotify/.cache",
                                         # )
                                         # sp = spotipy.Spotify(auth_manager=auth_manager)
                                         # try:
@@ -1365,7 +1302,7 @@ if __name__ == "__main__":
                                                 SPOTIFY_SECRET,
                                                 "http://localhost:5173/callback",
                                                 scope="user-modify-playback-state",
-                                                cache_path="/home/matthewpi/Spotify/.cache",
+                                                cache_path="/home/madspi/Spotify/.cache",
                                             )
                                             sp = spotipy.Spotify(
                                                 auth_manager=auth_manager
@@ -1380,7 +1317,7 @@ if __name__ == "__main__":
                                                 #     SPOTIFY_SECRET,
                                                 #     "http://localhost:5173/callback",
                                                 #     scope="user-modify-playback-state",
-                                                #     cache_path="/home/matthewpi/Spotify/.cache",
+                                                #     cache_path="/home/madspi/Spotify/.cache",
                                                 # )
                                                 # sp = spotipy.Spotify(
                                                 #     auth_manager=auth_manager
@@ -1399,7 +1336,7 @@ if __name__ == "__main__":
                                                 #     SPOTIFY_SECRET,
                                                 #     "http://localhost:5173/callback",
                                                 #     scope="user-modify-playback-state",
-                                                #     cache_path="/home/matthewpi/Spotify/.cache",
+                                                #     cache_path="/home/madspi/Spotify/.cache",
                                                 # )
                                                 # sp = spotipy.Spotify(
                                                 #     auth_manager=auth_manager
@@ -1442,7 +1379,7 @@ if __name__ == "__main__":
                         #     SPOTIFY_SECRET,
                         #     "http://localhost:5173/callback",
                         #     scope="user-modify-playback-state",
-                        #     cache_path="/home/matthewpi/Spotify/.cache",
+                        #     cache_path="/home/madspi/Spotify/.cache",
                         # )
                         # sp = spotipy.Spotify(auth_manager=auth_manager)
                         # try:
@@ -1458,7 +1395,7 @@ if __name__ == "__main__":
                                 SPOTIFY_SECRET,
                                 "http://localhost:5173/callback",
                                 scope="user-modify-playback-state",
-                                cache_path="/home/matthewpi/Spotify/.cache",
+                                cache_path="/home/madspi/Spotify/.cache",
                             )
                             sp = spotipy.Spotify(auth_manager=auth_manager)
                             if sp.currently_playing()["is_playing"]:
@@ -1471,7 +1408,7 @@ if __name__ == "__main__":
                                 #     SPOTIFY_SECRET,
                                 #     "http://localhost:5173/callback",
                                 #     scope="user-modify-playback-state",
-                                #     cache_path="/home/matthewpi/Spotify/.cache",
+                                #     cache_path="/home/madspi/Spotify/.cache",
                                 # )
                                 # sp = spotipy.Spotify(auth_manager=auth_manager)
                                 # try:
@@ -1491,7 +1428,7 @@ if __name__ == "__main__":
                                 #     SPOTIFY_SECRET,
                                 #     "http://localhost:5173/callback",
                                 #     scope="user-modify-playback-state",
-                                #     cache_path="/home/matthewpi/Spotify/.cache",
+                                #     cache_path="/home/madspi/Spotify/.cache",
                                 # )
                                 # sp = spotipy.Spotify(auth_manager=auth_manager)
                                 # try:
@@ -1568,7 +1505,7 @@ if __name__ == "__main__":
             #     SPOTIFY_SECRET,
             #     "http://localhost:5173/callback",
             #     scope="user-modify-playback-state",
-            #     cache_path="/home/matthewpi/Spotify/.cache",
+            #     cache_path="/home/madspi/Spotify/.cache",
             # )
             # sp = spotipy.Spotify(auth_manager=auth_manager)
             if originalState:
@@ -1599,7 +1536,7 @@ if __name__ == "__main__":
         messages.append({"role": "user", "content": text})
         messages = cropToMeetMaxTokens(messages)
         response = client.chat.completions.create(
-            model=REASONING_MODEL, messages=messages
+            model=MODEL, messages=messages
         )
         responseText = response.choices[0].message.content
         # Add response to conversation memory
@@ -1633,7 +1570,7 @@ if __name__ == "__main__":
         #     SPOTIFY_SECRET,
         #     "http://localhost:5173/callback",
         #     scope="user-modify-playback-state",
-        #     cache_path="/home/matthewpi/Spotify/.cache",
+        #     cache_path="/home/madspi/Spotify/.cache",
         # )
         # sp = spotipy.Spotify(auth_manager=auth_manager)
         if originalState:
