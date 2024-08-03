@@ -9,7 +9,8 @@ def sendPrompt(
     ):
     systemMessage = [{"role": "system", "content": systemMessage}]
     messages = cropToMeetMaxTokens(messages)
-    client = OpenAI(api_key=GROQ_SECRET, base_url=GROQ_BASE_URL)
+    client = OpenAI(api_key=OPENAI_SECRET)
+    # client = OpenAI(api_key=GROQ_SECRET, base_url=GROQ_BASE_URL)
     response = client.chat.completions.create(
         model=useModel,
         messages=systemMessage + messages

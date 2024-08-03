@@ -53,7 +53,7 @@ def manageSongRequests(sp):
     stateCol = db["spotifies"]
     previousSearch = ''
     search = ''
-    requestSong = ['', '']
+    requestSong = {'title': '', 'uri': '', 'image': '', 'artistsOrOwner': ''}
     previousPlayState = 0
     while True:
         state = None
@@ -74,12 +74,12 @@ def manageSongRequests(sp):
                 playlists = searchResults['playlists']['items']
                 formattedPlaylists = []
                 for playlist in playlists:
-                    formattedPlaylists.append([playlist['name'], playlist['uri'], playlist['images'][0]['url']])
+                    formattedPlaylists.append({'title': playlist['name'], 'uri': playlist['uri'], 'image': playlist['images'][0]['url'], 'artistsOrOwner': [playlist['owner']['display_name']]})
 
                 tracks = searchResults['tracks']['items']
                 formattedTracks = []
                 for track in tracks:
-                    formattedTracks.append([track['name'], track['uri'], track['album']['images'][0]['url']])
+                    formattedTracks.append({'title': track['name'], 'uri': track['uri'], 'image': track['album']['images'][0]['url'], 'artistsOrOwner': [artist["name"] for artist in track["artists"]]})
                 
                 searchResults = formattedPlaylists + formattedTracks
                 stateCol.update_one(state, {'$set': {'searchResults': searchResults}})
@@ -90,22 +90,22 @@ def manageSongRequests(sp):
         
         # Start playing the requested song
         requestSong = state['songRequest']
-        if requestSong[0] != '':
+        if requestSong['title'] != '':
             try:
-                stateCol.update_one(state, {'$set': {'currentSong': requestSong, 'songRequest': ['', ''], 'playState': 1, 'playControl': 0}})
-                if 'playlist' in requestSong[1]:
+                stateCol.update_one(state, {'$set': {'currentSong': requestSong, 'songRequest': {'title': '', 'uri': '', 'image': '', 'artistsOrOwner': ''}, 'playState': 1, 'playControl': 0}})
+                if 'playlist' in requestSong['uri']:
                     sp.start_playback(
                         SPOTIFY_DEVICE_ID,
-                        context_uri=requestSong[1],
+                        context_uri=requestSong['uri'],
                         position_ms=0,
                     )
                     sp.shuffle(True, SPOTIFY_DEVICE_ID)
                     sp.next_track(SPOTIFY_DEVICE_ID)
-                elif 'track' in requestSong[1]:
+                elif 'track' in requestSong['uri']:
                     sp.shuffle(False, SPOTIFY_DEVICE_ID)
                     sp.start_playback(
                         SPOTIFY_DEVICE_ID,
-                        uris=[requestSong[1]],
+                        uris=[requestSong['uri']],
                         position_ms=0,
                     )
             except:
@@ -113,15 +113,17 @@ def manageSongRequests(sp):
         
         # Update current song and play state
         currentSong = state['currentSong']
-        if currentSong[0] != '' and time.time() - lastCall > 1:
+        if currentSong['title'] != '' and time.time() - lastCall > 1:
             lastCall = time.time()
             try:
                 current = sp.currently_playing()
                 song = current["item"]
                 uri = song["uri"]
                 name = song["name"]
-                if uri != currentSong[1]:
-                    stateCol.update_one(state, {'$set': {'currentSong': [name, uri]}})
+                image = song["album"]["images"][0]["url"]
+                artists = [artist["name"] for artist in song["artists"]]
+                if uri != currentSong['uri']:
+                    stateCol.update_one(state, {'$set': {'currentSong': {'title': name, 'uri': uri, 'image': image, 'artistsOrOwner': artists}}})
                 
                 globalPlayState = current["is_playing"]
                 if globalPlayState and previousPlayState == 0:
