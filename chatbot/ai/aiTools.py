@@ -4,7 +4,7 @@ from openai import OpenAI
 
 def sendPrompt(
     messages,
-    systemMessage="You are a helpful assistant that will answer all the user's prompts to the best of your abilities. If your answer contains a math equation please format it in LateX",
+    systemMessage="You are a helpful assistant that will answer all the user's prompts to the best of your abilities.",
     useModel=MODEL
     ):
     systemMessage = [{"role": "system", "content": systemMessage}]
