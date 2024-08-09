@@ -3,11 +3,11 @@ import time
 import certifi
 import alsaaudio
 from config import *
-import RPi.GPIO as GPIO
 from pymongo import MongoClient
 from multiprocessing import Process, Queue
 from lights.ringLight import *
 from audio.audioOut import *
+from tactile.inputHandler import *
 
 def volControlInit(stateCol, pixels, lightsUsageStatus, sleepLightsState, currentColor):
     # Volume control requirements
@@ -79,7 +79,7 @@ def volControl(
                 audio.setvolume(0)
         
         # Increase volume
-        if GPIO.input(23) == GPIO.HIGH and GPIO.input(24) == GPIO.LOW:
+        if readInputs() == "volumeUp":
             try:
                 terminateVolLights.put("terminate")
             except:
@@ -102,7 +102,7 @@ def volControl(
             currentVol = currentVol + 5 if (currentVol + 5 < 100) else 100
             volQueue.put(currentVol)
             holdStart = time.time()
-            while GPIO.input(23) == GPIO.HIGH and GPIO.input(24) == GPIO.LOW:
+            while readInputs() == "volumeUp":
                 time.sleep(0.1)
                 if time.time() - holdStart >= 1:
                     try:
@@ -130,7 +130,7 @@ def volControl(
                     stateCol.update_one(state, {'$set': {'volume': currentVol}})
                     volQueue.put(currentVol)
         # Decrease volume
-        elif GPIO.input(23) == GPIO.LOW and GPIO.input(24) == GPIO.HIGH:
+        elif readInputs() == "volumeDown":
             try:
                 terminateVolLights.put("terminate")
             except:
@@ -153,7 +153,7 @@ def volControl(
             currentVol = currentVol - 5 if (currentVol - 5 > 0) else 0
             volQueue.put(currentVol)
             holdStart = time.time()
-            while GPIO.input(23) == GPIO.HIGH or GPIO.input(24) == GPIO.HIGH:
+            while readInputs() == "volumeDown":
                 time.sleep(0.1)
                 if time.time() - holdStart >= 1:
                     try:

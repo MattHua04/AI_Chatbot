@@ -1,6 +1,5 @@
 import time
 from config import *
-import RPi.GPIO as GPIO
 from rpi_ws281x import *
 from multiprocessing import Process, Queue
 

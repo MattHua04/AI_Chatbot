@@ -3,7 +3,6 @@ import time
 import certifi
 import spotipy
 from config import *
-import RPi.GPIO as GPIO
 from rpi_ws281x import *
 from openai import OpenAI
 from spotipy.oauth2 import *
@@ -43,8 +42,8 @@ if __name__ == "__main__":
 
     while True:
         # Wait for action button to reset before continuing
-        while GPIO.input(16) == GPIO.HIGH:
-            time.sleep(1)
+        while readInputs() == "action":
+            pass
         # Listen for wakeword
         manager = Manager()
         return_dict = manager.dict()
@@ -69,16 +68,12 @@ if __name__ == "__main__":
         physicalInput = False
         awaking = False
         while listen.is_alive():
-            if GPIO.input(16) == GPIO.HIGH:
+            if readInputs() == "action":
                 skipInput = False
                 # Check for sleep request
                 tryingToSleep = False
                 holdStart = time.time()
-                while (
-                    GPIO.input(16) == GPIO.HIGH
-                    and GPIO.input(23) != GPIO.HIGH
-                    and GPIO.input(24) != GPIO.HIGH
-                ):
+                while (readInputs() == "action"):
                     if time.time() - holdStart >= 1:
                         tryingToSleep = True
                     if time.time() - holdStart >= 2:
@@ -95,24 +90,20 @@ if __name__ == "__main__":
                         )
                         sleepLightsOn.start()
                         sleep = True
-                        while GPIO.input(16) == GPIO.HIGH:
-                            time.sleep(0.1)
+                        while readInputs() == "action":
+                            pass
                         # Start sleeping
                         while sleep:
-                            if GPIO.input(16) == GPIO.HIGH:
+                            if readInputs() == "action":
                                 tryingToWake = False
                                 # Check for awake request
-                                if (
-                                    GPIO.input(16) == GPIO.HIGH
-                                    and GPIO.input(23) != GPIO.HIGH
-                                    and GPIO.input(24) != GPIO.HIGH
-                                ):
+                                if (readInputs() == "action"):
                                     holdStart = time.time()
                                     awake = True
                                     while time.time() - holdStart < 2:
                                         if time.time() - holdStart >= 1:
                                             tryingToWake = True
-                                        if GPIO.input(16) != GPIO.HIGH:
+                                        if readInputs() != "action":
                                             awake = False
                                             break
                                     if awake:
@@ -140,7 +131,7 @@ if __name__ == "__main__":
                                         )
                                         lights.start()
                                         awake.start()
-                                    while GPIO.input(16) == GPIO.HIGH:
+                                    while readInputs() == "action":
                                         time.sleep(0.1)
                                     onOff.put("lightsOff")
                                 if not tryingToWake:
@@ -149,15 +140,15 @@ if __name__ == "__main__":
                                     doubleClickStart = time.time()
                                     while time.time() - doubleClickStart < 0.5:
                                         time.sleep(0.1)
-                                        if GPIO.input(16) == GPIO.HIGH:
+                                        if readInputs() == "action":
                                             double = True
                                             break
-                                    while GPIO.input(16) == GPIO.HIGH:
+                                    while readInputs() == "action":
                                         time.sleep(0.1)
                                     tripleClickStart = time.time()
                                     while time.time() - doubleClickStart < 0.5:
                                         time.sleep(0.1)
-                                        if GPIO.input(16) == GPIO.HIGH:
+                                        if readInputs() == "action":
                                             triple = True
                                             break
                                     # Skip if triple clicked
@@ -194,7 +185,7 @@ if __name__ == "__main__":
                                                 print("Resuming . . .")
                                         except:
                                             pass
-                        while GPIO.input(16) == GPIO.HIGH:
+                        while readInputs() == "action":
                             time.sleep(0.1)
                         onOff.put("lightsOff")
                         skipInput = True
@@ -204,15 +195,15 @@ if __name__ == "__main__":
                     doubleClickStart = time.time()
                     while time.time() - doubleClickStart < 0.5:
                         time.sleep(0.1)
-                        if GPIO.input(16) == GPIO.HIGH:
+                        if readInputs() == "action":
                             double = True
                             break
-                    while GPIO.input(16) == GPIO.HIGH:
+                    while readInputs() == "action":
                         time.sleep(0.1)
                     tripleClickStart = time.time()
                     while time.time() - doubleClickStart < 0.5:
                         time.sleep(0.1)
-                        if GPIO.input(16) == GPIO.HIGH:
+                        if readInputs() == "action":
                             triple = True
                             break
                     # Skip if triple clicked
@@ -294,7 +285,7 @@ if __name__ == "__main__":
         # Cancel on action button
         cancelled = False
         while listenPrompt.is_alive():
-            if GPIO.input(16) == GPIO.HIGH:
+            if readInputs() == "action":
                 listenPrompt.terminate()
                 print("\033[KCancelled", end="\r")
                 convertToSpeech("Cancelling")
@@ -354,7 +345,7 @@ if __name__ == "__main__":
         response.start()
         # Stop responding on action button
         while response.is_alive():
-            if GPIO.input(16) == GPIO.HIGH:
+            if readInputs() == "action":
                 response.terminate()
                 os.system("killall mpg123")
                 break
