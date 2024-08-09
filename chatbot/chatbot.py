@@ -280,14 +280,14 @@ if __name__ == "__main__":
         return_dict = manager.dict()
         listenPrompt = Process(target=listenForPrompt, args=(recorder, sp, return_dict))
         listenPrompt.start()
-        print("\033[KI'm listening . . .", end="\r")
+        print("I'm listening . . .", end="\r")
         convertToSpeech("I'm listening")
         # Cancel on action button
         cancelled = False
         while listenPrompt.is_alive():
             if readInputs() == "action":
                 listenPrompt.terminate()
-                print("\033[KCancelled", end="\r")
+                print("Cancelled", end="\r")
                 convertToSpeech("Cancelling")
                 cancelled = True
                 break
@@ -317,7 +317,7 @@ if __name__ == "__main__":
         # Don't respond if chat cancelled verbally
         if text == "cancel":
             continue
-        print("\033[KMe: " + text)
+        print("Me: " + text)
 
         # Send prompt to ChatGPT
         client = OpenAI(api_key=GROQ_SECRET, base_url=GROQ_BASE_URL)

@@ -81,7 +81,7 @@ def listenForKeyWord(
                 lights.start()
                 convertToSpeech("Resetting conversation")
                 onOff.put("lightsOff")
-                print("\033c", end="\r")
+                print("Resetting conversation")
                 text = ""
             # Verbally increase volume level
             elif "turn it up" in text.lower() or "louder" in text.lower():
@@ -233,7 +233,7 @@ def listenForKeyWord(
                 convertToSpeech("Rebooting")
                 onOff.put("lightsOff")
                 lights.join()
-                print("\033c", end="\r")
+                print("Rebooting")
                 messages = "reboot"
                 break
     return_dict[0] = messages
@@ -312,11 +312,11 @@ def listenForPrompt(recorder, sp, return_dict):
                 # Stop listening for prompt when "cancel" is heard
                 if "cancel" in text.lower():
                     text = "cancel"
-                    print("\033[KCancelled", end="\r")
+                    print("Cancelled", end="\r")
                     convertToSpeech("Cancelling")
                     break
             except:
-                print("\033[KSorry I didn't catch that, could you repeat?", end="\r")
+                print("Sorry I didn't catch that, could you repeat?", end="\r")
                 convertToSpeech("Sorry I didn't catch that, could you repeat?")
                 pass
     return_dict[0] = text
